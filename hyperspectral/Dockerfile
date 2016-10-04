@@ -5,14 +5,17 @@ MAINTAINER Yan Y. Liu <yanliu@illinois.edu>
 
 # install common libraries and python modules
 USER root
-RUN apt-get update
-RUN apt-get upgrade -y -q 
-RUN apt-get install -y -q build-essential m4 swig antlr libantlr-dev udunits-bin libudunits2-dev unzip cmake wget git libjpeg-dev libpng-dev libtiff-dev
-RUN apt-get install -y -q python-dev python-numpy python-pip python-virtualenv
-# set up dirs for user installed software
-RUN useradd -m -s /bin/bash ubuntu
-RUN mkdir /srv/downloads && chown -R ubuntu: /srv/downloads && \
-    mkdir /srv/sw && chown -R ubuntu: /srv/sw
+RUN apt-get update && \
+    apt-get upgrade -y -q && \
+    apt-get install -y -q build-essential m4 swig antlr libantlr-dev udunits-bin libudunits2-dev \
+                          unzip cmake wget git libjpeg-dev libpng-dev libtiff-dev \
+                          python-dev python-numpy python-pip python-virtualenv && \
+    # set up dirs for user installed software
+    useradd -m -s /bin/bash ubuntu && \
+    mkdir /srv/downloads && \
+    chown -R ubuntu: /srv/downloads && \
+    mkdir /srv/sw && \
+    chown -R ubuntu: /srv/sw
 
 USER ubuntu
 # set env vars for common libraries and python paths
@@ -90,9 +93,9 @@ WORKDIR "${USERHOME}"
 RUN cd ${USERHOME} && \
     virtualenv pyenv && \
     . pyenv/bin/activate && \
-    pip install pika && \
+    pip install pika urllib3 requests && \
     CC=gcc CXX=g++ USE_SETUPCFG=0 HDF5_INCDIR=/srv/sw/hdf5-1.8.17/include HDF5_LIBDIR=/srv/sw/hdf5-1.8.17/lib NETCDF4_INCDIR=/srv/sw/netcdf-4.4.1/include NETCDF4_LIBDIR=/srv/sw/netcdf-4.4.1/lib pip install netCDF4 && \
-    pip install git+https://opensource.ncsa.illinois.edu/stash/scm/cats/pyclowder.git@bugfix/CATS-554-add-pyclowder-support-for-dataset && \
+    pip install git+https://opensource.ncsa.illinois.edu/stash/scm/cats/pyclowder.git@local-mount-path-downloading && \
     deactivate
 
 ## install hyperspectral image converter script
@@ -104,19 +107,13 @@ ENV INPUTDIR="${USERHOME}/input" \
     OUTPUTDIR="${USERHOME}/output"
 RUN mkdir -p "${INPUTDIR}" && \
     mkdir -p "${OUTPUTDIR}" && \
-    mkdir -p "${USERHOME}/logs" \
-    mkdir -p "${USERHOME}/test-data"
+    mkdir -p "${USERHOME}/logs"
 
 ## download test input data
-RUN wget -q http://141.142.168.44/nfiedata/yanliu/terraref-hyperspectral-input-sample.tgz && \
-    tar -xf terraref-hyperspectral-input-sample.tgz -C "./test-data" --strip-components 1
+# RUN wget -q http://141.142.168.44/nfiedata/yanliu/terraref-hyperspectral-input-sample.tgz && \
+#    tar -xf terraref-hyperspectral-input-sample.tgz -C "./test-data" --strip-components 1
 
-## install extractor
-ENV RABBITMQ_URI="" \
-    RABBITMQ_EXCHANGE="clowder" \
-    RABBITMQ_VHOST="%2F" \
-    RABBITMQ_QUEUE="terra.hyperspectral" \
-    WORKER_SCRIPT="${PIPELINEDIR}/scripts/hyperspectral/terraref.sh"
+
 COPY entrypoint.sh extractor_info.json config.py terra.hyperspectral.py ./
 ENTRYPOINT ["./entrypoint.sh"]
 CMD ["python", "./terra.hyperspectral.py"]

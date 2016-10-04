@@ -27,6 +27,12 @@ messageType = "*.dataset.file.added"
 # trust certificates, set this to false for self signed certificates
 sslVerify = os.getenv('RABBITMQ_SSLVERIFY', False)
 
+# Comma delimited list of endpoints and keys for registering extractor information
+registrationEndpoints = os.getenv('REGISTRATION_ENDPOINTS', "http://localhost:9000/clowder/extractors")
+
+# Dictionary that maps {"remote Clowder source path": "local mounted path"} for streamlining Clowder downloads
+mountedPaths = {}
+
 # Location of terraref.sh
 workerScript = os.getenv('WORKER_SCRIPT', "terraref.sh")
 

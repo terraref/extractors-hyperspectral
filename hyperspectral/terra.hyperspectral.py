@@ -19,21 +19,35 @@ import pyclowder.extractors as extractors
 
 
 def main():
-	global extractorName, messageType, rabbitmqExchange, rabbitmqURL
+	global extractorName, messageType, rabbitmqExchange, rabbitmqURL, registrationEndpoints, mountedPaths
 
-	# Set logging
+	#set logging
 	logging.basicConfig(format='%(levelname)-7s : %(name)s -  %(message)s', level=logging.WARN)
 	logging.getLogger('pyclowder.extractors').setLevel(logging.INFO)
+	logger = logging.getLogger('extractor')
+	logger.setLevel(logging.DEBUG)
 
-	# Connect to rabbitmq
-	extractors.connect_message_bus(
-		extractorName        = extractorName,
-		messageType          = messageType,
-		rabbitmqExchange     = rabbitmqExchange,
-		rabbitmqURL          = rabbitmqURL,
-		processFileFunction  = process_dataset,
-		checkMessageFunction = check_message
-	)
+	print("main")
+	print(rabbitmqURL)
+	print(rabbitmqExchange)
+
+	# setup
+	extractors.setup(extractorName=extractorName,
+					 messageType=messageType,
+					 rabbitmqURL=rabbitmqURL,
+					 rabbitmqExchange=rabbitmqExchange,
+					 mountedPaths=mountedPaths)
+
+	# register extractor info
+	extractors.register_extractor(registrationEndpoints)
+
+	#connect to rabbitmq
+	extractors.connect_message_bus(extractorName=extractorName,
+								   messageType=messageType,
+								   processFileFunction=process_dataset,
+								   checkMessageFunction=check_message,
+								   rabbitmqExchange=rabbitmqExchange,
+								   rabbitmqURL=rabbitmqURL)
 
 def check_message(parameters):
 	# Check for expected input files before beginning processing
@@ -43,7 +57,7 @@ def check_message(parameters):
 			return False
 		else:
 			# Handle the message but do not download any files automatically.
-			return "bypass"
+			return True
 	else:
 		print 'skipping, not all input files are ready'
 		return False
@@ -52,6 +66,10 @@ def check_message(parameters):
 # Process the dataset message and upload the results
 def process_dataset(parameters):
 	global extractorName, workerScript, inputDirectory, outputDirectory
+
+	print("PD")
+	print(parameters)
+	fail()
 
 	# Find input files in dataset
 	files = get_all_files(parameters)
