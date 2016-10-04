@@ -65,32 +65,12 @@ def check_message(parameters):
 # ----------------------------------------------------------------------
 # Process the dataset message and upload the results
 def process_dataset(parameters):
-	global extractorName, workerScript, inputDirectory, outputDirectory
 
 	print("PD")
 	print(parameters)
-	fail()
+	global extractorName, workerScript, inputDirectory, outputDirectory, requiredInputFiles
 
 	# Find input files in dataset
-	files = get_all_files(parameters)
-
-	# Download files to input directory
-	for fileExt in files:
-		files[fileExt]['path'] = extractors.download_file(
-			channel            = parameters['channel'],
-			header             = parameters['header'],
-			host               = parameters['host'],
-			key                = parameters['secretKey'],
-			fileid             = files[fileExt]['id'],
-			# What's this argument for?
-			intermediatefileid = files[fileExt]['id'],
-			ext                = fileExt
-		)
-		# Restore temp filenames to original - script requires specific name formatting so tmp names aren't suitable
-		files[fileExt]['old_path'] = files[fileExt]['path']
-		files[fileExt]['path'] = os.path.join(inputDirectory, files[fileExt]['filename'])
-		os.rename(files[fileExt]['old_path'], files[fileExt]['path'])
-		print 'found %s file: %s' % (fileExt, files[fileExt]['path'])
 
 	# Invoke terraref.sh
 	outFilePath = os.path.join(outputDirectory, get_output_filename(files['_raw']['filename']))

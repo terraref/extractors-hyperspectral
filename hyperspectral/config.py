@@ -47,7 +47,6 @@ requiredInputFiles = [
 	'_raw',
 	'_raw.hdr',
 	'_image.jpg',
-	'_metadata.json',
 	'_frameIndex.txt',
 	'_settings.txt'
 ]
