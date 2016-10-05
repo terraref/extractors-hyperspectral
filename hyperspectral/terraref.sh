@@ -2,7 +2,7 @@
 
 # Purpose: Convert raw imagery from 2D raster to 3D compressed netCDF annotated with metadata
 
-# Source: https://github.com/terraref/computing-pipeline/tree/master/scripts/hyperspectral/terraref.sh
+# Source: https://github.com/terraref/extractors-hyperspectral/blob/master/hyperspectral/terraref.sh
 
 # Prerequisites:
 # NCO version 4.6.0 (dated 20160401) or later
@@ -11,8 +11,6 @@
 # In Anaconda:
 # conda install netCDF4
 
-# Direct install:
-# scp ~/terraref/computing-pipeline/scripts/hyperspectral/terraref.sh roger-login.ncsa.illinois.edu:terraref/computing-pipeline/scripts/hyperspectral/terraref.sh
 
 # Configure paths at High-Performance Computer Centers (HPCCs) based on ${HOSTNAME}
 if [ -z "${HOSTNAME}" ]; then
@@ -512,7 +510,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	jsn_out="${jsn_fl}.fl${idx_prn}.tmp"
 	printf "jsn(in)  : ${jsn_in}\n"
 	printf "jsn(out) : ${jsn_fl}\n"
-	cmd_jsn[${fl_idx}]="python ${HOME}/terraref/computing-pipeline/scripts/hyperspectral/JsonDealer.py ${jsn_in} ${jsn_out}"
+	cmd_jsn[${fl_idx}]="python ${HOME}/JsonDealer.py ${jsn_in} ${jsn_out}"
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_jsn[${fl_idx}]}
 	fi # !dbg
@@ -550,7 +548,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	clb_out="${clb_fl}.fl${idx_prn}.tmp"
 	printf "clb(in)  : ${clb_in}\n"
 	printf "clb(out) : ${clb_out}\n"
-	cmd_clb[${fl_idx}]="ncap2 -O -S ${HOME}/terraref/computing-pipeline/scripts/hyperspectral/terraref.nco ${clb_in} ${clb_out}"
+	cmd_clb[${fl_idx}]="ncap2 -O -S ${HOME}/terraref.nco ${clb_in} ${clb_out}"
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_clb[${fl_idx}]}
 	fi # !dbg
@@ -612,7 +610,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	anl_out="${anl_fl}.fl${idx_prn}.tmp"
 	printf "2D  : ${anl_in}\n"
 	printf "3D  : ${anl_out}\n"
-	cmd_anl[${fl_idx}]="${cmd_mpi[${fl_idx}]} ncap2 -4 -v -O -s \*wvl_nbr=${wvl_nbr} -S ${HOME}/terraref/computing-pipeline/scripts/hyperspectral/new_analysis.nco ${anl_in} ${anl_out}"
+	cmd_anl[${fl_idx}]="${cmd_mpi[${fl_idx}]} ncap2 -4 -v -O -s \*wvl_nbr=${wvl_nbr} -S ${HOME}/new_analysis.nco ${anl_in} ${anl_out}"
 	
 	# Block 5 Loop 2: Execute and/or echo commands
 	if [ ${dbg_lvl} -ge 1 ]; then

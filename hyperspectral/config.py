@@ -38,7 +38,7 @@ workerScript = os.getenv('WORKER_SCRIPT', "terraref.sh")
 
 # Workspace for input/output files.
 inputDirectory = os.getenv('INPUTDIR', "./input")
-outputDirectory = os.getenv('OUTPUTDIR', "./output")
+outputDirectory = os.getenv('OUTPUTDIR', "/home/ubuntu/sites/ua-mac/Level_1/hyperspectral")
 
 # The extractor will only run when all these files are present.
 # These are just filename postfixes for file matching.

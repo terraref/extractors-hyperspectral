@@ -98,22 +98,12 @@ RUN cd ${USERHOME} && \
     pip install git+https://opensource.ncsa.illinois.edu/stash/scm/cats/pyclowder.git@local-mount-path-downloading && \
     deactivate
 
-## install hyperspectral image converter script
-ENV PIPELINEDIR="${USERHOME}/computing-pipeline"
-RUN git clone https://github.com/terraref/computing-pipeline.git "${PIPELINEDIR}"
-
 ## create workspace directories
-ENV INPUTDIR="${USERHOME}/input" \
-    OUTPUTDIR="${USERHOME}/output"
+ENV INPUTDIR="${USERHOME}/input"
 RUN mkdir -p "${INPUTDIR}" && \
-    mkdir -p "${OUTPUTDIR}" && \
     mkdir -p "${USERHOME}/logs"
 
-## download test input data
-# RUN wget -q http://141.142.168.44/nfiedata/yanliu/terraref-hyperspectral-input-sample.tgz && \
-#    tar -xf terraref-hyperspectral-input-sample.tgz -C "./test-data" --strip-components 1
 
-
-COPY entrypoint.sh extractor_info.json config.py terra.hyperspectral.py ./
+COPY *.sh extractor_info.json *.py terraref.nco  ./
 ENTRYPOINT ["./entrypoint.sh"]
 CMD ["python", "./terra.hyperspectral.py"]
