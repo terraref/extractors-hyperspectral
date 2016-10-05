@@ -130,21 +130,35 @@ def process_dataset(parameters):
 				files[fileExt]['path'] = newMetaName
 				with open(newMetaName, 'r') as md_file:
 					md_contents = json.load(md_file)
+				for md in md_contents:
+					if 'content' in md and 'lemnatec_measurement_metadata' in md['content']:
+						with open(newMetaName, 'w') as md_file:
+							md_file.write(json.dumps(md['content']))
+			print 'found %s file: %s' % (fileExt, files[fileExt]['path'])
+
+	else:
+		inputDirectory = distinctPaths[0]
 
 	# Invoke terraref.sh
+	outFilePath = os.path.join(outputDirectory,
+							   parameters['datasetInfo']['name'].split(' - ')[1].split('__')[0],
+							   parameters['datasetInfo']['name'].split(' - ')[1],
+							   get_output_filename(files['_raw']['filename']))
 	print 'invoking terraref.sh to create: %s' % outFilePath
+	out_dir = outFilePath.replace(os.path.basename(outFilePath), '')
+	if not os.path.exists(out_dir):
+		os.makedirs(out_dir)
+	returncode = subprocess.call(["bash", workerScript, "-d", "2", "-I", inputDirectory, "-o", outFilePath])
 	print 'done creating output file (%s)' % (returncode)
 
 	if returncode != 0:
-		print 'terraref.sh encountered an error'
+		print 'script encountered an error'
 
 	# Verify outfile exists and upload to clowder
 	if os.path.exists(outFilePath):
-		print 'output file detected'
 		if returncode == 0:
 			print 'uploading output file...'
 			extractors.upload_file_to_dataset(filepath=outFilePath, parameters=parameters)
-			print 'done uploading'
 		# Clean up the output file.
 		os.remove(outFilePath)
 	else:
@@ -154,7 +168,6 @@ def process_dataset(parameters):
 	# Clean up the input files.
 	for fileExt in files:
 		os.remove(files[fileExt]['path'])
-	print 'done cleaning'
 
 # ----------------------------------------------------------------------
 # Find as many expected files as possible and return the set.
@@ -169,6 +182,7 @@ def get_all_files(parameters):
 			fileId   = fileItem['id']
 			fileName = fileItem['filename']
 			for fileExt in files:
+				if fileName.endswith(fileExt):
 					files[fileExt] = {
 						'id': fileId,
 						'filename': fileName
@@ -184,6 +198,7 @@ def get_output_filename(raw_filename):
 # Returns true if all expected files are found.
 def has_all_files(parameters):
 	files = get_all_files(parameters)
+
 	allFilesFound = True
 	for fileExt in files:
 		if files[fileExt] == None:
