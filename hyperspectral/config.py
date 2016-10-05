@@ -34,7 +34,7 @@ registrationEndpoints = os.getenv('REGISTRATION_ENDPOINTS', "http://localhost:90
 mountedPaths = {}
 
 # Location of terraref.sh
-workerScript = os.getenv('WORKER_SCRIPT', "terraref.sh")
+workerScript = os.getenv('WORKER_SCRIPT', "hyperspectral_workflow.sh")
 
 # Workspace for input/output files.
 inputDirectory = os.getenv('INPUTDIR', "./input")

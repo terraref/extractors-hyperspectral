@@ -104,6 +104,6 @@ RUN mkdir -p "${INPUTDIR}" && \
     mkdir -p "${USERHOME}/logs"
 
 
-COPY *.sh extractor_info.json *.py terraref.nco  ./
+COPY *.sh extractor_info.json *.py *.nco  ./
 ENTRYPOINT ["./entrypoint.sh"]
 CMD ["python", "./terra.hyperspectral.py"]

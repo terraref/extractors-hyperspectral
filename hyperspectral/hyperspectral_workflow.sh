@@ -2,15 +2,38 @@
 
 # Purpose: Convert raw imagery from 2D raster to 3D compressed netCDF annotated with metadata
 
-# Source: https://github.com/terraref/extractors-hyperspectral/blob/master/hyperspectral/terraref.sh
+# Source: https://github.com/terraref/computing-pipeline/tree/master/scripts/hyperspectral/hyperspectral_workflow.sh
+
+# Documentation:
+# https://docs.google.com/document/d/1w_zHHlrPVKsy1mnW9wrVzAU2edVqZH8i1IZa5BZxVpo/edit#heading=h.jjfbhbos05cc # Calibration employed since 20160908
+# https://github.com/terraref/computing-pipeline/issues/88 # Calibration employed until 20160908
 
 # Prerequisites:
 # NCO version 4.6.0 (dated 20160401) or later
 # Python: Python 2.7.X or 3.X (preferred) with netCDF4 module
+# hyperspectral_workflow.sh, hyperspectral_calibration.nco, hyperspectral_metadata.py and environmental_logger_json2netcdf.py must be in same directory
 
 # In Anaconda:
 # conda install netCDF4
 
+# Direct install:
+# scp ~/terraref/computing-pipeline/scripts/hyperspectral/hyperspectral_workflow.sh roger-login.ncsa.illinois.edu:terraref/computing-pipeline/scripts/hyperspectral/hyperspectral_workflow.sh
+
+# Set script name, directory, PID, run directory
+drc_pwd=${PWD}
+# Set these before 'module' command which can overwrite ${BASH_SOURCE[0]}
+# NB: dash supports $0 syntax, not ${BASH_SOURCE[0]} syntax
+# http://stackoverflow.com/questions/59895/can-a-bash-script-tell-what-directory-its-stored-in
+spt_src="${BASH_SOURCE[0]}"
+[[ -z "${spt_src}" ]] && spt_src="${0}" # Use ${0} when BASH_SOURCE is unavailable (e.g., dash)
+while [ -h "${spt_src}" ]; do # Recursively resolve ${spt_src} until file is no longer a symlink
+  drc_spt="$( cd -P "$( dirname "${spt_src}" )" && pwd )"
+  spt_src="$(readlink "${spt_src}")"
+  [[ ${spt_src} != /* ]] && spt_src="${drc_spt}/${spt_src}" # If ${spt_src} was relative symlink, resolve it relative to path where symlink file was located
+done
+drc_spt="$( cd -P "$( dirname "${spt_src}" )" && pwd )"
+spt_nm=$(basename ${spt_src}) # [sng] Script name (Unlike $0, ${BASH_SOURCE[0]} works well with 'source <script>')
+spt_pid=$$ # [nbr] Script PID (process ID)
 
 # Configure paths at High-Performance Computer Centers (HPCCs) based on ${HOSTNAME}
 if [ -z "${HOSTNAME}" ]; then
@@ -20,50 +43,56 @@ if [ -z "${HOSTNAME}" ]; then
 	export HOSTNAME=`/usr/bin/hostname`
     fi # !hostname
 fi # HOSTNAME
-# Default input and output directory is ${DATA}
-if [ -z "${DATA}" ]; then
-    case "${HOSTNAME}" in 
-	cg-gpu* ) DATA="/lustre/atlas/world-shared/cli115/${USER}" ; ;; # NCSA roger compute nodes named cg-gpuNN, fxm GB/node
-	* ) DATA='/tmp' ; ;; # Other
-    esac # !HOSTNAME
-fi # DATA
-# Ensure batch jobs access correct 'mpirun' (or, on edison, 'aprun') command, netCDF library, and NCO executables and library:
-case "${HOSTNAME}" in 
+# Ensure batch jobs access correct executables and libraries for python, mpirun, netCDF, and NCO:
+case "${HOSTNAME}" in
     cg-gpu* )
-# 20160422: /usr/bin/python is version 2.6.6. Must load Python 2.7+
-	module add gdal-stack-2.7.10 
-	module add netcdf nco
-#        export PATH='/home/zender/bin'\:${PATH}
-#	export LD_LIBRARY_PATH='/home/zender/lib'\:${LD_LIBRARY_PATH} ; ;;
+	module add gdal-stack-2.7.10 # 20160422: /usr/bin/python is version 2.6.6. Must load Python 2.7+
+	module add netcdf nco # hyperspectral_workflow.sh requires NCO version 4.6.0 (dated 20160401) or later
+	# Following two lines guarantee use of latest NCO executables Zender's directories:
+	#       export PATH='/home/zender/bin'\:${PATH}
+	#	export LD_LIBRARY_PATH='/home/zender/lib'\:${LD_LIBRARY_PATH} ; ;;
 esac # !HOSTNAME
 
 # Production
-# NCSA: ls -R /projects/arpae/terraref/raw_data/ua-mac/MovingSensor/VNIR/2016-04-07/*/*_raw | terraref.sh -d 1 -O /gpfs_scratch/arpae/imaging_spectrometer > ~/terraref.out 2>&1 &
-# UCI:  ls -R ${DATA}/terraref/MovingSensor/VNIR/2016-04-07/*/*_raw | terraref.sh -d 1 -O ~/rgr > ~/terraref.out 2>&1 &
+# UIUC: ls -R /projects/arpae/terraref/sites/ua-mac/raw_data/VNIR/2016-04-07/*/*_raw | hyperspectral_workflow.sh -d 1 -O /gpfs_scratch/arpae/imaging_spectrometer > ~/terraref.out 2>&1 &
+# UIUC: hyperspectral_workflow.sh -d 1 -i /projects/arpae/terraref/sites/ua-mac/raw_data/SWIR/2016-06-28/2016-06-28__09-10-16-386/a33641c2-8a1e-4a63-9d33-ab66717d6b8a_raw
+# UCI:  ls -R ${DATA}/terraref/MovingSensor/VNIR/2016-04-07/*/*_raw | hyperspectral_workflow.sh -d 1 -O ~/rgr > ~/terraref.out 2>&1 &
 
 # Test cases (for Charlie's machines)
-# terraref.sh $fl > ~/terraref.out 2>&1 &
+# hyperspectral_workflow.sh $fl > ~/terraref.out 2>&1 &
 
 # Debugging and Benchmarking:
-# terraref.sh -d 1 -i ${DATA}/terraref/whiteReference_raw -o whiteReference.nc -O ~/rgr > ~/terraref.out 2>&1 &
-# terraref.sh -d 1 -i ${DATA}/terraref/MovingSensor/SWIR/2016-03-05/2016-03-05__09-46_17_450/8d54accb-0858-4e31-aaac-e021b31f3188_raw -o foo.nc -O ~/rgr > ~/terraref.out 2>&1 &
-# terraref.sh -d 1 -i ${DATA}/terraref/MovingSensor/VNIR/2016-03-05/2016-03-05__09-46_17_450/72235cd1-35d5-480a-8443-14281ded1a63_raw -o foo.nc -O ~/rgr > ~/terraref.out 2>&1 &
+# hyperspectral_workflow.sh -d 1 -i ${DATA}/terraref/whiteReference_raw -o whiteReference.nc -O ~/rgr > ~/terraref.out 2>&1 &
+# hyperspectral_workflow.sh -d 1 -i ${DATA}/terraref/MovingSensor/SWIR/2016-03-05/2016-03-05__09-46_17_450/8d54accb-0858-4e31-aaac-e021b31f3188_raw -o foo.nc -O ~/rgr > ~/terraref.out 2>&1 &
+# hyperspectral_workflow.sh -d 1 -i ${DATA}/terraref/MovingSensor/VNIR/2016-03-05/2016-03-05__09-46_17_450/72235cd1-35d5-480a-8443-14281ded1a63_raw -o foo.nc -O ~/rgr > ~/terraref.out 2>&1 &
 
 # dbg_lvl: 0 = Quiet, print basic status during evaluation
 #          1 = Print configuration, full commands, and status to output during evaluation
-#          2 = As in dbg_lvl=1, but _do not evaluate commands_
+#          2 = As in dbg_lvl=1, but do _not_ evaluate commands
 #          3 = As in dbg_lvl=1, and pass debug level through to NCO/ncks
 
-# Set script name and run directory
-drc_pwd=${PWD}
-nco_version=$(ncks --version 2>&1 >/dev/null | grep NCO | awk '{print $5}')
-spt_nm=$(basename ${0}) # [sng] Script name
-spt_pid=$$ # [nbr] Script PID (process ID)
+# Set NCO version and directory
+nco_exe=`which ncks`
+if [ -z "${nco_exe}" ]; then
+    echo "ERROR: Unable to find NCO, nco_exe = ${nco_exe}"
+    exit 1
+fi # !nco_exe
+# Use stackoverflow method to find NCO directory
+while [ -h "${nco_exe}" ]; do
+  drc_nco="$( cd -P "$( dirname "${nco_exe}" )" && pwd )"
+  nco_exe="$(readlink "${nco_exe}")"
+  [[ ${nco_exe} != /* ]] && nco_exe="${drc_nco}/${nco_exe}"
+done
+drc_nco="$( cd -P "$( dirname "${nco_exe}" )" && pwd )"
+nco_vrs=$(ncks --version 2>&1 >/dev/null | grep NCO | awk '{print $5}')
 
-# Set fonts for legibility
-fnt_nrm=`tput sgr0` # Normal
-fnt_bld=`tput bold` # Bold
-fnt_rvr=`tput smso` # Reverse
+# When running in a terminal window (not in an non-interactive batch queue)...
+if [ -n "${TERM}" ]; then
+    # Set fonts for legibility
+    fnt_nrm=`tput sgr0` # Normal
+    fnt_bld=`tput bold` # Bold
+    fnt_rvr=`tput smso` # Reverse
+fi # !TERM
 
 # Defaults for command-line options and some derived variables
 cln_flg='Yes' # [flg] Clean-up (remove) intermediate files before exiting
@@ -73,7 +102,7 @@ drc_in='' # [sng] Input file directory
 drc_in_xmp='drc_in' # [sng] Input file directory for examples
 drc_out="${drc_pwd}" # [sng] Output file directory
 drc_out_xmp='drc_out' # [sng] Output file directory for examples
-gaa_sng="--gaa terraref_script=${spt_nm} --gaa terraref_hostname=${HOSTNAME} --gaa terraref_version=${nco_version}" # [sng] Global attributes to add
+gaa_sng="--gaa terraref_script=${spt_nm} --gaa terraref_hostname=${HOSTNAME} --gaa terraref_version=${nco_vrs}" # [sng] Global attributes to add
 hdr_pad='10000' # [B] Pad at end of header section
 in_fl='' # [sng] Input file stub
 in_xmp='test_raw' # [sng] Input file for examples
@@ -243,34 +272,34 @@ if [ -z "${drc_in}" ]; then
 else # !drc_in
     drc_in_usr_flg='Yes'
 fi # !drc_in
-if [ -n "${job_usr}" ]; then 
+if [ -n "${job_usr}" ]; then
     job_nbr="${job_usr}"
 fi # !job_usr
 if [ ${dbg_lvl} -ge 2 ]; then
     nco_opt="-D ${dbg_lvl} ${nco_opt}"
 fi # !dbg_lvl
-if [ -n "${nco_usr}" ]; then 
+if [ -n "${nco_usr}" ]; then
     nco_opt="${nco_usr} ${nco_opt}"
 fi # !var_lst
-if [ -n "${gaa_sng}" ]; then 
+if [ -n "${gaa_sng}" ]; then
     nco_opt="${nco_opt} ${gaa_sng}"
 fi # !var_lst
-if [ -n "${hdr_pad}" ]; then 
+if [ -n "${hdr_pad}" ]; then
     nco_opt="${nco_opt} --hdr_pad=${hdr_pad}"
 fi # !hdr_pad
-if [ -n "${out_fl}" ]; then 
+if [ -n "${out_fl}" ]; then
     out_usr_flg='Yes'
 fi # !out_fl
 if [ -n "${par_typ}" ]; then
-    if [ "${par_typ}" != 'bck' ] && [ "${par_typ}" != 'mpi' ] && [ "${par_typ}" != 'nil' ]; then 
+    if [ "${par_typ}" != 'bck' ] && [ "${par_typ}" != 'mpi' ] && [ "${par_typ}" != 'nil' ]; then
 	    echo "ERROR: Invalid -p par_typ option = ${par_typ}"
 	    echo "HINT: Valid par_typ arguments are 'bck', 'mpi', and 'nil'"
 	    exit 1
     fi # !par_typ
 fi # !par_typ
-if [ "${par_typ}" = 'bck' ]; then 
+if [ "${par_typ}" = 'bck' ]; then
     par_opt=' &'
-elif [ "${par_typ}" = 'mpi' ]; then 
+elif [ "${par_typ}" = 'mpi' ]; then
     mpi_flg='Yes'
     par_opt=' &'
 fi # !par_typ
@@ -283,8 +312,8 @@ if [ -n "${in_fl}" ]; then
 else # !in_fl
     # Detecting input on stdin:
     # http://stackoverflow.com/questions/2456750/detect-presence-of-stdin-contents-in-shell-script
-    # ls *_raw | terraref.sh -D 1 -O ~/rgr
-    if [ -t 0 ]; then 
+    # ls *_raw | hyperspectral_workflow.sh -D 1 -O ~/rgr
+    if [ -t 0 ]; then
 	if [ "${drc_in_usr_flg}" = 'Yes' ]; then
 	    for fl in "${drc_in}"/*_raw ; do
 		if [ -f "${fl}" ]; then
@@ -292,13 +321,13 @@ else # !in_fl
 		    let fl_nbr=${fl_nbr}+1
 		fi # !file
 	    done
-	    if [ "${fl_nbr}" -eq 0 ]; then 
+	    if [ "${fl_nbr}" -eq 0 ]; then
 		echo "ERROR: Input directory specified with -I contains no *_raw files"
 		echo "HINT: Pipe file list to script via stdin with, e.g., 'ls *_raw | ${spt_nm}'"
 		exit 1
 	    fi # !fl_nbr
 	else # !drc_in
-	    if [ "${mtd_mk}" != 'Yes' ]; then 
+	    if [ "${mtd_mk}" != 'Yes' ]; then
 		echo "ERROR: Must specify input file with -i, with stdin, or directory of *_raw files with -I"
 		echo "HINT: Pipe file list to script via stdin with, e.g., 'ls *_raw | ${spt_nm}'"
 		exit 1
@@ -314,18 +343,18 @@ else # !in_fl
 fi # !in_fl
 
 if [ "${mpi_flg}" = 'Yes' ]; then
-    if [ -n "${COBALT_NODEFILE}" ]; then 
+    if [ -n "${COBALT_NODEFILE}" ]; then
 	nd_fl="${COBALT_NODEFILE}"
-    elif [ -n "${PBS_NODEFILE}" ]; then 
+    elif [ -n "${PBS_NODEFILE}" ]; then
 	nd_fl="${PBS_NODEFILE}"
-    elif [ -n "${SLURM_NODELIST}" ]; then 
+    elif [ -n "${SLURM_NODELIST}" ]; then
 	nd_fl="${SLURM_NODELIST}"
     else
 	echo "ERROR: MPI job unable to find node list"
 	echo "HINT: ${spt_nm} uses first node list found in \$COBALT_NODEFILE (= \"${COBALT_NODEFILE}\"), \$PBS_NODEFILE (= \"${PBS_NODEFILE}\"), \$SLURM_NODELIST (= \"${SLURM_NODELIST}\")"
 	exit 1
     fi # !PBS
-    if [ -n "${nd_fl}" ]; then 
+    if [ -n "${nd_fl}" ]; then
 	# NB: nodes are 0-based, e.g., [0..11]
 	nd_idx=0
 	for nd in `cat ${nd_fl} | uniq` ; do
@@ -334,7 +363,7 @@ if [ "${mpi_flg}" = 'Yes' ]; then
 	done # !nd
 	nd_nbr=${#nd_nm[@]}
 	for ((fl_idx=0;fl_idx<fl_nbr;fl_idx++)); do
-	    case "${HOSTNAME}" in 
+	    case "${HOSTNAME}" in
 		cori* | edison* | nid* )
 		    # NB: NERSC staff says srun automatically assigns to unique nodes even without "-L $node" argument?
 		    cmd_mpi[${fl_idx}]="srun -L ${nd_nm[$((${fl_idx} % ${nd_nbr}))]} -n 1" ; ;; # NERSC
@@ -351,10 +380,10 @@ if [ "${mpi_flg}" = 'Yes' ]; then
 	    cmd_mpi[${fl_idx}]=""
 	done # !fl_idx
     fi # !pbs
-    if [ -z "${job_usr}" ]; then 
+    if [ -z "${job_usr}" ]; then
 	job_nbr=${nd_nbr}
     fi # !job_usr
-    if [ -z "${thr_usr}" ]; then 
+    if [ -z "${thr_usr}" ]; then
 	if [ -n "${PBS_NUM_PPN}" ]; then
 #	NB: use export OMP_NUM_THREADS when thr_nbr > 8
 #	thr_nbr=${PBS_NUM_PPN}
@@ -368,7 +397,9 @@ if [ ${dbg_lvl} -ge 2 ]; then
     printf "dbg: cln_flg  = ${cln_flg}\n"
     printf "dbg: dbg_lvl  = ${dbg_lvl}\n"
     printf "dbg: drc_in   = ${drc_in}\n"
+    printf "dbg: drc_nco  = ${drc_nco}\n"
     printf "dbg: drc_out  = ${drc_out}\n"
+    printf "dbg: drc_spt  = ${drc_spt}\n"
     printf "dbg: drc_tmp  = ${drc_tmp}\n"
     printf "dbg: gaa_sng  = ${gaa_sng}\n"
     printf "dbg: hdr_pad  = ${hdr_pad}\n"
@@ -400,8 +431,12 @@ mkdir -p ${drc_tmp}
 
 # Human-readable summary
 if [ ${dbg_lvl} -ge 1 ]; then
-    printf "Terraref data pipeline invoked with command:\n"
+    printf "Terraref hyperspectral data workflow invoked with:\n"
     echo "${cmd_ln}"
+    printf "Hyperspectral workflow scripts in directory ${drc_spt}\n"
+    printf "NCO version ${nco_vrs} from directory ${drc_nco}\n"
+    printf "Intermediate/temporary files written to directory ${drc_tmp}\n"
+    printf "Final output stored in directory ${drc_out}\n"
 fi # !dbg
 date_srt=$(date +"%s")
 
@@ -415,8 +450,8 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
     fi # !basename
     idx_prn=`printf "%02d" ${fl_idx}`
     printf "Input #${idx_prn}: ${in_fl}\n"
-    if [ "${out_usr_flg}" = 'Yes' ]; then 
-	if [ ${fl_nbr} -ge 2 ]; then 
+    if [ "${out_usr_flg}" = 'Yes' ]; then
+	if [ ${fl_nbr} -ge 2 ]; then
 	    echo "ERROR: Single output filename specified with -o for multiple input files"
 	    echo "HINT: For multiple input files use -O option to specify output directory and do not use -o option. Output files will have same name as input files, but will be in different directory."
 	    exit 1
@@ -468,7 +503,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	    12 ) typ_in='NC_USHORT' ; ;;
 	    * ) printf "${spt_nm}: ERROR Unknown typ_in in ${hdr_fl}. Debug grep command.\n" ; exit 1 ; ;; # Other
 	esac # !typ_in_ENVI
-	cmd_trn[${fl_idx}]="ncks -O --trr_wxy=${wvl_nbr},${xdm_nbr},${ydm_nbr} --trr typ_in=${typ_in} --trr typ_out=${typ_out} --trr ntl_in=${ntl_in} --trr ntl_out=${ntl_out} --trr_in=${trn_in} ~/nco/data/in.nc ${trn_out}"
+	cmd_trn[${fl_idx}]="ncks -O --trr_wxy=${wvl_nbr},${xdm_nbr},${ydm_nbr} --trr typ_in=${typ_in} --trr typ_out=${typ_out} --trr ntl_in=${ntl_in} --trr ntl_out=${ntl_out} --trr_in=${trn_in} ${drc_spt}/hyperspectral_dummy.nc ${trn_out}"
 	hst_att="`date`: ${cmd_ln}"
 	att_in="${trn_out}"
 	if [ ${dbg_lvl} -ge 1 ]; then
@@ -485,7 +520,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	att_in=${fl_in[$fl_idx]/_raw/_raw.nc}
 	hst_att="`date`: ${cmd_ln};Skipped translation step"
     fi # !trn_flg
-    
+
     # Add workflow-specific metadata
     if [ "${att_flg}" = 'Yes' ]; then
 	att_out="${att_fl}.fl${idx_prn}.tmp"
@@ -503,14 +538,14 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	    fi # !err
 	fi # !dbg
     fi # !att_flg
-    
+
     # Parse metadata from JSON to netCDF (sensor location, instrument configuration)
     if [ "${jsn_flg}" = 'Yes' ]; then
 	jsn_in="${fl_in[${fl_idx}]}"
 	jsn_out="${jsn_fl}.fl${idx_prn}.tmp"
 	printf "jsn(in)  : ${jsn_in}\n"
 	printf "jsn(out) : ${jsn_fl}\n"
-	cmd_jsn[${fl_idx}]="python ${HOME}/JsonDealer.py ${jsn_in} ${jsn_out}"
+	cmd_jsn[${fl_idx}]="python ${drc_spt}/hyperspectral_metadata.py ${jsn_in} ${jsn_out}"
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_jsn[${fl_idx}]}
 	fi # !dbg
@@ -541,21 +576,39 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	    fi # !err
 	fi # !dbg
     fi # !mrg_flg
-    
+
     # Calibrate
     if [ "${clb_flg}" = 'Yes' ]; then
 	clb_in=${mrg_out}
 	clb_out="${clb_fl}.fl${idx_prn}.tmp"
 	printf "clb(in)  : ${clb_in}\n"
 	printf "clb(out) : ${clb_out}\n"
-	cmd_clb[${fl_idx}]="ncap2 -O -S ${HOME}/terraref.nco ${clb_in} ${clb_out}"
+	# NB: ncap2 can only append root-level data to files with groups, and cannot create/copy groups itself
+	# Hyperspectral Metadata has always been placed in groups
+	# As of ~201605 Environmental Sensor uses groups
+	# Calibration (theoretically) uses ES data (for absolute fluxes), so must be done on group files
+	# Following command would not propagate any group data/metadata from input to output file
+	# cmd_clb[${fl_idx}]="ncap2 -O -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_out}"
+	# Hence perform calibration as root-level append operation, then, if successful, move file to output file
+	cmd_clb[${fl_idx}]="ncap2 -A -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_in}"
+	if [ ${dbg_lvl} -ge 1 ]; then
+	    echo ${cmd_clb[${fl_idx}]}
+	fi # !dbg
+	if [ ${dbg_lvl} -ne 2 ]; then
+	    eval ${cmd_clb[${fl_idx}]}
+	    if [ $? -ne 0 ]; then
+		printf "${spt_nm}: ERROR Failed to calibrate data in ncap2. Debug this:\n${cmd_clb[${fl_idx}]}\n"
+		exit 1
+	    fi # !err
+	fi # !dbg
+	cmd_clb[${fl_idx}]="/bin/mv -f ${clb_in} ${clb_out}"
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_clb[${fl_idx}]}
 	fi # !dbg
 	if [ ${dbg_lvl} -ne 2 ]; then
 	    eval ${cmd_clb[${fl_idx}]}
 	    if [ $? -ne 0 ] || [ ! -f ${clb_out} ]; then
-		printf "${spt_nm}: ERROR Failed to calibrate data. Debug this:\n${cmd_clb[${fl_idx}]}\n"
+		printf "${spt_nm}: ERROR Failed to move calibrated data. Debug this:\n${cmd_clb[${fl_idx}]}\n"
 		exit 1
 	    fi # !err
 	fi # !dbg
@@ -590,7 +643,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	rip_out=${out_fl}
 	printf "rip(in)  : ${rip_in}\n"
 	printf "rip(out) : ${rip_out}\n"
-	cmd_rip[${fl_idx}]="mv ${rip_in} ${rip_out}"
+	cmd_rip[${fl_idx}]="/bin/mv -f ${rip_in} ${rip_out}"
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_rip[${fl_idx}]}
 	fi # !dbg
@@ -604,14 +657,14 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
     fi # !rip_flg
 
     # 20160330: Entire block made obsolete by ncks conversion capability
-    # Keep template in terraref.sh in case parallelization with barrier becomes attractive again
+    # Keep template in hyperspectral_workflow.sh in case parallelization with barrier becomes attractive again
     if [ 0 -eq 1 ]; then
 	anl_in=${att_fl}
 	anl_out="${anl_fl}.fl${idx_prn}.tmp"
 	printf "2D  : ${anl_in}\n"
 	printf "3D  : ${anl_out}\n"
-	cmd_anl[${fl_idx}]="${cmd_mpi[${fl_idx}]} ncap2 -4 -v -O -s \*wvl_nbr=${wvl_nbr} -S ${HOME}/new_analysis.nco ${anl_in} ${anl_out}"
-	
+	cmd_anl[${fl_idx}]="${cmd_mpi[${fl_idx}]} ncap2 -4 -v -O -s \*wvl_nbr=${wvl_nbr} -S ${drc_spt}/new_analysis.nco ${anl_in} ${anl_out}"
+
 	# Block 5 Loop 2: Execute and/or echo commands
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_anl[${fl_idx}]}
@@ -628,7 +681,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 		anl_pid[${fl_idx}]=$!
 	    fi # !par_typ
 	fi # !dbg
-	
+
 	# Block 6: Wait
 	# Parallel processing (both Background and MPI) spawn simultaneous processes in batches of ${job_nbr}
 	# Once ${job_nbr} jobs are running, wait() for all to finish before issuing another batch
@@ -651,11 +704,11 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	    fi # !bch_flg
 	fi # !par_typ
     fi # !0
-    
+
 done # !fl_idx
 
 # 20160330: Entire block made obsolete by ncks conversion capability
-# Keep in terraref.sh until wavelength capability re-implemented
+# Keep in hyperspectral_workflow.sh until wavelength capability re-implemented
 if [ 0 -eq 1 ]; then
     # Parallel mode will often exit loop after a partial batch, wait() for remaining jobs to finish
     if [ -n "${par_opt}" ]; then
