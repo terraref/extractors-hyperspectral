@@ -28,10 +28,6 @@ def main():
 	logger = logging.getLogger('extractor')
 	logger.setLevel(logging.DEBUG)
 
-	print("main")
-	print(rabbitmqURL)
-	print(rabbitmqExchange)
-
 	# setup
 	extractors.setup(extractorName=extractorName,
 					 messageType=messageType,
@@ -148,7 +144,8 @@ def process_dataset(parameters):
 	out_dir = outFilePath.replace(os.path.basename(outFilePath), '')
 	if not os.path.exists(out_dir):
 		os.makedirs(out_dir)
-	returncode = subprocess.call(["bash", workerScript, "-d", "2", "-I", inputDirectory, "-o", outFilePath])
+	#returncode = subprocess.call(["bash", workerScript, "-d", "2", "-I", inputDirectory, "-o", outFilePath])
+	returncode = subprocess.call(["bash", workerScript, "-d", "1", "-i", files['_raw']['path'], "-o", outFilePath])
 	print 'done creating output file (%s)' % (returncode)
 
 	if returncode != 0:
@@ -159,15 +156,8 @@ def process_dataset(parameters):
 		if returncode == 0:
 			print 'uploading output file...'
 			extractors.upload_file_to_dataset(filepath=outFilePath, parameters=parameters)
-		# Clean up the output file.
-		os.remove(outFilePath)
 	else:
 		print 'no output file was produced'
-
-	print 'cleaning up...'
-	# Clean up the input files.
-	for fileExt in files:
-		os.remove(files[fileExt]['path'])
 
 # ----------------------------------------------------------------------
 # Find as many expected files as possible and return the set.
