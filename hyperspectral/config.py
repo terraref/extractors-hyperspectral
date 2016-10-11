@@ -28,7 +28,7 @@ messageType = "*.dataset.file.added"
 sslVerify = os.getenv('RABBITMQ_SSLVERIFY', False)
 
 # Comma delimited list of endpoints and keys for registering extractor information
-registrationEndpoints = os.getenv('REGISTRATION_ENDPOINTS', "http://localhost:9000/clowder/extractors")
+registrationEndpoints = os.getenv('REGISTRATION_ENDPOINTS', "http://localhost:9000/clowder/api/extractors")
 
 # Dictionary that maps {"remote Clowder source path": "local mounted path"} for streamlining Clowder downloads
 mountedPaths = {}
