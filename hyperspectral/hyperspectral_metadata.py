@@ -14,8 +14,8 @@ python hyperspectral_metadata.py filePath1 filePath2
 
 where
 hyperspectral_metadata.py is where this script located
-filePath1      is source data file
-filePath2      is user's desired output file
+filePath1 is source data file
+filePath2 is user's desired output file
 
 Warning:
 Make sure the json metadata ended with <data_name>+_metadata.json and the hdr file ended with <data_name>+_raw.hdr
@@ -31,7 +31,7 @@ python ${HOME}/terraref/computing-pipeline/scripts/hyperspectral/hyperspectral_m
 hyperspectral_metadata.py will authomatically find data_raw, data_metadata.json and data_raw.hdr
 
 Example:
-python ${HOME}/terraref/computing-pipeline/scripts/hyperspectral/hyperspectral_metadata.py ${DATA}/terraref/test_metadata.json ${DATA}/terraref/data
+python ${HOME}/terraref/computing-pipeline/scripts/hyperspectral/hyperspectral_metadata.py -C SWIR -dbg=json ${DATA}/terraref/test_metadata.json ${DATA}/terraref/data
 ----------------------------------------------------------------------------------------
 UPDATE LOG (reverse chronological order)
 
@@ -42,7 +42,7 @@ Update 20160822:
 Fix major bugs, including:
 1. file checking functions now works as expectedly by reimplemented with regular expression
 2. the data from "user_given_metadata" are saved as group attributes except those time variables
-3. translateTime() now could calculate either time since Unix base time or the time split between certain time points
+3. translate_time() now could calculate either time since Unix base time or the time split between certain time points
 Other improvements including better implementations on DataContainer and a more friendly prompts to users
 when the output file had already existed.
 
@@ -65,28 +65,41 @@ hyperspectral_metadata widely uses regular expressions to match string; although
 with Java, PHP, Perl, etc., some of the regular expressions are only supported by the Python standard.
 ----------------------------------------------------------------------------------------
 '''
-import numpy as np
+import sys
+try:
+    import numpy as np
+except ImportError as AFatalError:
+    print >> sys.stderr, AFatalError
+    exit()
 import json
 import time
-import sys
 import os
 import re
-import platform
 import struct
 from datetime import date, datetime
 from netCDF4 import Dataset
-from hyperspectral_calculation import pixel2Geographic
+from hyperspectral_calculation import pixel2Geographic, REFERENCE_POINT
 
 _UNIT_DICTIONARY = {'m': 'meter',
                     's': 'second', 'm/s': 'meter second-1', '': ''}
+
 _VELOCITY_DICTIONARY = {'x': 'u', 'y': 'v', 'z': 'w'}
+
 DATATYPE = {'1': ('H', 2), '2': ('i', 4), '3': ('l', 4), '4': ('f', 4), '5': (
     'd', 8), '12': ('H', 4), '13': ('L', 4), '14': ('q', 8), '15': ('Q', 8)}
-_RAW_VERSION      = platform.python_version()[0]
+
 _UNIX_BASETIME    = date(year=1970, month=1, day=1)
-_FILENAME_PATTERN = r'^(\S+)_(\w{3,10})[.](\w{3,4})$'
-_TIME_PATTERN     = re.compile(r'(\d{4})-(\d{2})-(\d{2})'), re.compile(r'(\d{2})/(\d{2})/(\d{4})\s(\d{2}):(\d{2}):(\d{2})'), re.compile(r'(\d{2}):(\d{2}):(\d{2})')
-_CAMERA_POSITION  = np.array([1.9, 0.855, 0.635])
+
+_IS_DIGIT         = lambda fakeNum: set([member.isdigit() for member in fakeNum.split(".")]) == {True}
+_TIMESTAMP        = lambda: time.strftime("%a %b %d %H:%M:%S %Y",  time.localtime(int(time.time())))
+
+_WARN_MSG         = "{msg}"
+
+_DEBUGOPT         = {"json"  : False, 
+                     "graph" : False,
+                     "latlon": False}
+
+_CAMERAOPT        = "SWIR"
 
 
 class DataContainer(object):
@@ -113,252 +126,344 @@ class DataContainer(object):
         # weird, but useful to check whether the HeaderInfo id in the netCDF
         # file
         setattr(self, "header_info", None)
-        netCDFHandler = _fileExistingCheck(outputFilePath, self)
+        netCDFHandler = _file_existence_check(outputFilePath, self)
         delattr(self, "header_info")
-        printOnVersion('\033[0;31mProcessing ...\033[0m')
 
-        if not netCDFHandler:
-            return
+        #### Replace the original isdigit function
 
         ##### Write the data from metadata to netCDF #####
-        for members in self.__dict__:
-            tempGroup = netCDFHandler.createGroup(members)
-            for submembers in self.__dict__[members]:
-                if not isDigit(self.__dict__[members][submembers]): #Case for letter variables
-                    if 'date' in submembers:
-                        tempVariable = tempGroup.createVariable(_replaceIllegalChar(submembers), 'f8')
-                        tempVariable.assignValue(translateTime(self.__dict__[members][submembers]))
+        for key, data in self.__dict__.items():
+            tempGroup = netCDFHandler.createGroup(key)
+            for subkey, subdata in data.items():
+                if not _IS_DIGIT(subdata): #Case for letter variables
+                    if 'date' in subkey and subkey != "date of installation" and subkey != "date of handover":
+                        assert subdata != "todo", '"todo" is not a legal value for the keys'
+
+                        tempVariable = tempGroup.createVariable(_reformat_string(subkey), 'f8')
+                        tempVariable[...] = translate_time(subdata)
                         setattr(tempVariable, "units",     "days since 1970-01-01 00:00:00")
                         setattr(tempVariable, "calender", "gregorian")
-                    setattr(tempGroup, _replaceIllegalChar(submembers),
-                            self.__dict__[members][submembers])
+
+                    setattr(tempGroup, _reformat_string(subkey), subdata)
 
                 else: #Case for digits variables
-                    if "time" in self.__dict__[members]:
-                        yearMonthDate = self.__dict__[members]["time"]
-                    elif "Time" in self.__dict__[members]:
-                        yearMonthDate = self.__dict__[members]["Time"]
-                    setattr(tempGroup, _replaceIllegalChar(submembers),
-                            self.__dict__[members][submembers])
-                    nameSet = _spliter(submembers)
+                    if "time" in data:
+                        yearMonthDate = data["time"]
+                    elif "Time" in data:
+                        yearMonthDate = data["Time"]
+                    setattr(tempGroup, _reformat_string(subkey), subdata)
 
-                    if 'Velocity' in submembers or 'Position' in submembers:
-                        tempVariable = tempGroup.createVariable(
-                                nameSet[0][-1], 'f8')
-                        setattr(tempVariable, 'long_name', nameSet[0][0])
-                        setattr(tempVariable, 'units',      nameSet[1])
-                    else:
-                        tempVariable = tempGroup.createVariable(
-                                nameSet[0], 'f8')
-                        setattr(tempVariable, 'long_name', nameSet[0])
+                    short_name, attributes = _generate_attr(subkey)
+                    tempVariable = tempGroup.createVariable(short_name, 'f8')
+                    for name, value in attributes.items():
+                        setattr(tempVariable, name, value)
+                    tempVariable[...] = float(subdata)
 
-                    tempVariable.assignValue(
-                            float(self.__dict__[members][submembers]))
-
-        ##### Write the data from header files to netCDF #####
-        wavelength = getWavelength(inputFilePath)
+        ##### Write data from header files to netCDF #####
+        wavelength = get_wavelength(inputFilePath)
         netCDFHandler.createDimension("wavelength", len(wavelength))
+
+        # Check if the wavelength is correctly collected
+        assert len(wavelength) in (955, 272), "ERROR: Failed to get wavlength informations. Please check if you modified the *.hdr files"
+
+        _CAMERAOPT = 'VNIR' if len(wavelength) == 955 else 'SWIR' # Choose appropriate camera by counting the number of wavelengths.
+
         tempWavelength = netCDFHandler.createVariable(
-                "wavelength", 'f8', 'wavelength')
+            "wavelength", 'f8', 'wavelength')
         setattr(tempWavelength, 'long_name', 'Hyperspectral Wavelength')
         setattr(tempWavelength, 'units', 'nanometers')
         tempWavelength[:] = wavelength
-        writeHeaderFile(inputFilePath, netCDFHandler)
+        write_header_file(inputFilePath, netCDFHandler)
 
         ##### Write the data from frameIndex files to netCDF #####
-        tempFrameTime = frameIndexParser(''.join((inputFilePath.strip("raw"), "frameIndex.txt")), yearMonthDate)
+        tempFrameTime = frame_index_parser(''.join((inputFilePath.strip("raw"), "frameIndex.txt")), yearMonthDate)
         netCDFHandler.createDimension("time", len(tempFrameTime))
+
+        # Check if the frame time information is correctly collected
+        assert len(tempFrameTime), "ERROR: Failed to collect frame time information from " + ''.join((inputFilePath.strip("raw"), "frameIndex.txt")) + ". Please check the file."
+       
         frameTime    = netCDFHandler.createVariable("frametime", "f8", ("time",))
         frameTime[:] = tempFrameTime
-        setattr(frameTime, "units",     "days since 1970-01-01 00:00:00")
+        setattr(frameTime, "units",    "days since 1970-01-01 00:00:00")
         setattr(frameTime, "calender", "gregorian")
+        setattr(frameTime, "notes",    "Each time of the scanline of the y taken")
 
         ########################### Adding geographic positions ###########################
 
-        xPixelsLocation, yPixelsLocation, boundingBox, googleMapAddress \
-            = pixel2Geographic("".join((inputFilePath[:-4],"_metadata.json")), "".join((inputFilePath,'.hdr')))
+        xPixelsLocation, yPixelsLocation, boundingBox, googleMapAddress\
+         = pixel2Geographic("".join((inputFilePath[:-4],"_metadata.json")), "".join((inputFilePath,'.hdr')), _CAMERAOPT)
 
+        # Check if the image width and height are correctly collected.
+        assert len(xPixelsLocation) > 0 and len(yPixelsLocation) > 0, "ERROR, Failed to collect the image size metadata from " + "".join((inputFilePath,'.hdr')) + ". Please check the file."
+        
         netCDFHandler.createDimension("x", len(xPixelsLocation))
         x    = netCDFHandler.createVariable("x", "f8", ("x",))
         x[:] = xPixelsLocation
         setattr(netCDFHandler.variables["x"], "units", "meters")
-        setattr(netCDFHandler.variables['x'], 'reference_point', 'South East corner of the field')
-        setattr(netCDFHandler.variables['x'], "long_name", "real world X coordinates for each pixel")
+        setattr(netCDFHandler.variables['x'], 'reference_point', 'Southeast corner of field')
+        setattr(netCDFHandler.variables['x'], "long_name", "North-south offset from southeast corner of field")
 
         netCDFHandler.createDimension("y", len(yPixelsLocation))
         y    = netCDFHandler.createVariable("y", "f8", ("y",))
         y[:] = yPixelsLocation
         setattr(netCDFHandler.variables["y"], "units", "meters")
-        setattr(netCDFHandler.variables['y'], 'reference_point', 'South East corner of the field')
-        setattr(netCDFHandler.variables['x'], "long_name", "real world Y coordinates for each pixel")
+        setattr(netCDFHandler.variables['y'], 'reference_point', 'Southeast corner of field')
+        setattr(netCDFHandler.variables['y'], "long_name", "Distance west of the southeast corner of the field")
 
+        lat_pt, lon_pt = REFERENCE_POINT
+
+        lat_pt_var = netCDFHandler.createVariable("lat_reference_point", "f8")
+        lat_pt_var[...] = lat_pt
+        setattr(netCDFHandler.variables["lat_reference_point"], "units", "degrees_north")
+        setattr(netCDFHandler.variables["lat_reference_point"], "long_name", "Latitude of the master reference point at southeast corner of field")
+        setattr(netCDFHandler.variables["lat_reference_point"], "provenance", "https://github.com/terraref/reference-data/issues/32 by Dr. David LeBauer")
+
+        lon_pt_var = netCDFHandler.createVariable("lon_reference_point", "f8")
+        lon_pt_var[...] = lon_pt
+        setattr(netCDFHandler.variables["lon_reference_point"], "units", "degrees_east")
+        setattr(netCDFHandler.variables["lon_reference_point"], "long_name", "Longitude of the master reference point at southeast corner of field")
+        setattr(netCDFHandler.variables["lon_reference_point"], "provenance", "https://github.com/terraref/reference-data/issues/32 by Dr. David LeBauer")
+
+        x_ref_pt = netCDFHandler.createVariable("x_reference_point", "f8")
+        x_ref_pt[...] = 0
+        setattr(netCDFHandler.variables["x_reference_point"], "units", "meters")
+        setattr(netCDFHandler.variables["x_reference_point"], "long_name", "x of the master reference point at southeast corner of field")
+        setattr(netCDFHandler.variables["x_reference_point"], "provenance", "https://github.com/terraref/reference-data/issues/32 by Dr. David LeBauer")
+
+        y_ref_pt = netCDFHandler.createVariable("y_reference_point", "f8")
+        y_ref_pt[...] = 0
+        setattr(netCDFHandler.variables["y_reference_point"], "units", "meters")
+        setattr(netCDFHandler.variables["y_reference_point"], "long_name", "y of the master reference point at southeast corner of field")
+        setattr(netCDFHandler.variables["y_reference_point"], "provenance", "https://github.com/terraref/reference-data/issues/32 by Dr. David LeBauer")
+
+        # Write latitude and longitude of bounding box
         SE, SW, NE, NW = boundingBox[0], boundingBox[1], boundingBox[2], boundingBox[3]
+        lat_se, lon_se = tuple(SE.split(", "))
+        lat_sw, lon_sw = tuple(SW.split(", "))
+        lat_ne, lon_ne = tuple(NE.split(", "))
+        lat_nw, lon_nw = tuple(NW.split(", "))
 
-        southEast = netCDFHandler.createVariable("south_east_corner", str)
-        southEast[...] = SE
-        southWest = netCDFHandler.createVariable("south_west_corner", str)
-        southWest[...] = SW
-        northEast = netCDFHandler.createVariable("north_east_corner", str)
-        northEast[...] = NE
-        northWest = netCDFHandler.createVariable("north_west_corner", str)
-        northWest[...] = NW
+        latSe = netCDFHandler.createVariable("lat_img_se", "f8")
+        latSe[...] = float(lat_se)
+        setattr(netCDFHandler.variables["lat_img_se"], "units", "degrees_north")
+        setattr(netCDFHandler.variables["lat_img_se"], "long_name", "Latitude of southeast corner of image")
+
+        # have a "x_y_img_se" in meters, double
+        lonSe = netCDFHandler.createVariable("lon_img_se", "f8")
+        lonSe[...] = float(lon_se)
+        setattr(netCDFHandler.variables["lon_img_se"], "units", "degrees_east")
+        setattr(netCDFHandler.variables["lon_img_se"], "long_name", "Longitude of southeast corner of image")
+
+        latSw = netCDFHandler.createVariable("lat_img_sw", "f8")
+        latSw[...] = float(lat_sw)
+        setattr(netCDFHandler.variables["lat_img_sw"], "units", "degrees_north")
+        setattr(netCDFHandler.variables["lat_img_sw"], "long_name", "Latitude of southwest corner of image")
+
+        lonSw = netCDFHandler.createVariable("lon_img_sw", "f8")
+        lonSw[...] = float(lon_sw)
+        setattr(netCDFHandler.variables["lon_img_sw"], "units", "degrees_east")
+        setattr(netCDFHandler.variables["lon_img_sw"], "long_name", "Longitude of southwest corner of image")
+
+        latNe = netCDFHandler.createVariable("lat_img_ne", "f8")
+        latNe[...] = float(lat_ne)
+        setattr(netCDFHandler.variables["lat_img_ne"], "units", "degrees_north")
+        setattr(netCDFHandler.variables["lat_img_ne"], "long_name", "Latitude of northeast corner of image")
+
+        lonNe = netCDFHandler.createVariable("lon_img_ne", "f8")
+        lonNe[...] = float(lon_ne)
+        setattr(netCDFHandler.variables["lon_img_ne"], "units", "degrees_east")
+        setattr(netCDFHandler.variables["lon_img_ne"], "long_name", "Longitude of northeast corner of image")
+
+        latNw = netCDFHandler.createVariable("lat_img_nw", "f8")
+        latNw[...] = float(lat_nw)
+        setattr(netCDFHandler.variables["lat_img_nw"], "units", "degrees_north")
+        setattr(netCDFHandler.variables["lat_img_nw"], "long_name", "Latitude of northwest corner of image")
+
+        lonNw = netCDFHandler.createVariable("lon_img_nw", "f8")
+        lonNw[...] = float(lon_nw)
+        setattr(netCDFHandler.variables["lon_img_nw"], "units", "degrees_east")
+        setattr(netCDFHandler.variables["lon_img_nw"], "long_name", "Longitude of northwest corner of image")
+
+        xSe = netCDFHandler.createVariable("x_img_se", "f8")
+        xSe[...] = float(x[-1] + REFERENCE_POINT[0])
+        setattr(netCDFHandler.variables["x_img_se"], "units", "meters")
+        setattr(netCDFHandler.variables["x_img_se"], "long_name", "Southeast corner of image, north distance to reference point")
+
+        # have a "x_y_img_se" in meters, double
+        ySe = netCDFHandler.createVariable("y_img_se", "f8")
+        ySe[...] = float(y[-1] + REFERENCE_POINT[1])
+        setattr(netCDFHandler.variables["y_img_se"], "units", "meters")
+        setattr(netCDFHandler.variables["y_img_se"], "long_name", "Southeast corner of image, west distance to reference point")
+
+        xSw = netCDFHandler.createVariable("x_img_sw", "f8")
+        xSw[...] = float(x[0] + REFERENCE_POINT[0])
+        setattr(netCDFHandler.variables["x_img_sw"], "units", "meters")
+        setattr(netCDFHandler.variables["x_img_sw"], "long_name", "Southwest corner of image, north distance to reference point")
+
+        ySw = netCDFHandler.createVariable("y_img_sw", "f8")
+        ySw[...] = float(y[-1] + REFERENCE_POINT[1])
+        setattr(netCDFHandler.variables["y_img_sw"], "units", "meters")
+        setattr(netCDFHandler.variables["y_img_sw"], "long_name", "Southwest corner of image, west distance to reference point")
+
+        xNe = netCDFHandler.createVariable("x_img_ne", "f8")
+        xNe[...] = float(x[-1] + REFERENCE_POINT[0])
+        setattr(netCDFHandler.variables["x_img_ne"], "units", "meters")
+        setattr(netCDFHandler.variables["x_img_ne"], "long_name", "Northeast corner of image, north distance to reference point")
+
+        yNe = netCDFHandler.createVariable("y_img_ne", "f8")
+        yNe[...] = float(y[0] + REFERENCE_POINT[1])
+        setattr(netCDFHandler.variables["y_img_ne"], "units", "meters")
+        setattr(netCDFHandler.variables["y_img_ne"], "long_name", "Northeast corner of image, west distance to reference point")
+
+        xNw = netCDFHandler.createVariable("x_img_nw", "f8")
+        xNw[...] = float(x[0] + REFERENCE_POINT[0])
+        setattr(netCDFHandler.variables["x_img_nw"], "units", "meters")
+        setattr(netCDFHandler.variables["x_img_nw"], "long_name", "Northwest corner of image, north distance to reference point")
+
+        yNw = netCDFHandler.createVariable("y_img_nw", "f8")
+        yNw[...] = float(y[0] + REFERENCE_POINT[1])
+        setattr(netCDFHandler.variables["y_img_nw"], "units", "meters")
+        setattr(netCDFHandler.variables["y_img_nw"], "long_name", "Northwest corner of image, west distance to reference point")
 
         googleMapView = netCDFHandler.createVariable("Google_Map_View", str)
         googleMapView[...] = googleMapAddress
         setattr(netCDFHandler.variables["Google_Map_View"], "usage", "copy and paste to your web browser")
-        setattr(netCDFHandler.variables["Google_Map_View"], 'reference_point', 'South East corner of the field')
+        setattr(netCDFHandler.variables["Google_Map_View"], 'reference_point', 'Southeast corner of field')
 
         ##### Write the history to netCDF #####
-        netCDFHandler.history = ''.join((_timeStamp(), ': python ', commandLine))
+        netCDFHandler.history = ''.join((_TIMESTAMP(), ': python ', commandLine))
 
         netCDFHandler.close()
 
-
 def getDimension(fileName):
     '''
-    Acquire dimensions from related HDR file
+    Acquire dimensions from related HDR file; these dimensions are:
+    samples -> 'x'
+    lines   -> 'y'
+    bands   -> 'wavelength'
     '''
-    fileHandler = open(fileName + '.hdr')
+    with open("".join((fileName, '.hdr'))) as fileHandler:
+        for members in fileHandler.read().splitlines():
+            if "samples" == members[:7]:
+                x = members[members.find("=") + 1:len(members)]
+            elif "lines" == members[:5]:
+                y = members[members.find("=") + 1:len(members)]
+            elif "bands" == members[:5]:
+                wavelength = members[members.find("=") + 1:len(members)]
 
-    for members in fileHandler.readlines():
-        if "samples" == members[:7]:
-            x = members[members.find("=") + 1:len(members)]
-        elif "lines" == members[:5]:
-            y = members[members.find("=") + 1:len(members)]
-        elif "bands" == members[:5]:
-            wavelength = members[members.find("=") + 1:len(members)]
+        try:
+            return int(wavelength), int(x), int(y)
+        except:
+            if _DEBUGOPT["json"]:
+                print >> sys.stderr, _WARN_MSG.format(msg='ERROR: sample, lines and bands variables in header file are broken. Header information will not be written into the netCDF')
+            return 0, 0, 0
 
-    fileHandler.close()
-
-    try:
-        return int(wavelength.strip('\n').strip('\r')), int(x.strip('\n').strip('\r')), int(y.strip('\n').strip('\r'))
-    except:
-        printOnVersion('Fatal Warning: sample, lines and bands variables in header file are broken. Header information will not be written into the netCDF')
-
-
-def getWavelength(fileName):
+def get_wavelength(fileName):
     '''
     Acquire wavelength(s) from related HDR file
     '''
     with open("".join((fileName, '.hdr'))) as fileHandler:
-        wavelengthGroup = [float(x.strip('\r').strip('\n').strip(',')) for x in fileHandler.readlines()
-                           if isDigit(x.strip('\r').strip('\n').strip(','))]
-    return wavelengthGroup
+        wavelengthGroup = [float(x.strip(',')) for x in fileHandler.read().splitlines() if _IS_DIGIT(x.strip(','))]
+        return wavelengthGroup
 
 
-def getHeaderInfo(fileName):
+def get_header_info(fileName):
     '''
     Acquire Other Information from related HDR file
     '''
     with open("".join((fileName, '.hdr'))) as fileHandler:
-        infoDictionary = {members[0:members.find("=") - 1].strip(";"): members[members.find("=") + 2:].strip('\n').strip('\r')
-                          for members in fileHandler.readlines() if '=' in members and 'wavelength' not in members}
-
-    return infoDictionary
+        infoDictionary = {members[0:members.find("=") - 1].strip(";") : members[members.find("=") + 2:] for members in fileHandler.read().splitlines() if '=' in members and 'wavelength' not in members}
+        return infoDictionary
 
 
-def _fileExistingCheck(filePath, dataContainer):
+def _file_existence_check(filePath, dataContainer):
     '''
     This method will check wheter the filePath has the same variable name as the dataContainer has. If so,
     user will decide whether skip or overwrite it (no append,
     since netCDF does not support the repeating variable names)
     '''
-    userPrompt = '\033[0;31m--> Output file already exists; skip it or overwrite or append? (\033[4;31mS\033[0;31mkip, \033[4;31mO\033[0;31mverwrite, \033[4;31mA\033[0;31mppend\033[0m)'
+    userPrompt = _WARN_MSG.format(msg='--> Output file already exists; skip it or overwrite or append? (\033[4;31mS\033[0;31mkip, \033[4;31mO\033[0;31mverwrite, \033[4;31mA\033[0;31mppend)\033[0m')
 
     if os.path.isdir(filePath):
-        filePath += ("/" + filePath.split("/")[-1] + ".nc")
+        filePath += "".join(("/", filePath.split("/")[-1], ".nc"))
 
     if os.path.exists(filePath):
         netCDFHandler = Dataset(filePath, 'r', format='NETCDF4')
         if set([x.encode('utf-8') for x in netCDFHandler.groups]) - \
-                set([x for x in dataContainer.__dict__]) != set([x.encode('utf-8') for x in netCDFHandler.groups]):
+           set([x for x in dataContainer.__dict__]) != set([x.encode('utf-8') for x in netCDFHandler.groups]):
 
             while True:
-                if _RAW_VERSION == '2':
-                    exec("userChoice = str(raw_input(userPrompt))")
-                else:
-                    exec("userChoice = str(input(userPrompt))")
+                userChoice = str(raw_input(userPrompt))
 
                 if userChoice is 'S':
-                    return 0
-                elif userChoice is 'O' or 'A':
+                    print >> sys.stderr, "Exit due to the skipping"
+                    exit()
+                elif userChoice in ('O', 'A'):
                     os.remove(filePath)
                     return Dataset(filePath, 'w', format='NETCDF4')
         else:
             os.remove(filePath)
-            return Dataset(filePath, 'w', format='NETCDF4')
 
-    else:
-        return Dataset(filePath, 'w', format='NETCDF4')
+    return Dataset(filePath, 'w', format='NETCDF4')
 
-
-def isDigit(string):
+def _reformat_string(string):
     '''
-    This method will check whether the string can be convert to int or float
-    Similar to .isdight method in built-in string class, but python's will not check whether it is a float
+    This method will replace spaces (' '), slashes('/') and many other unwanted characters
     '''
-    try:
-        if '.' in string:
-            float(string)
-        else:
-            int(string)
-        return True
-    except:
-        return False
 
+    string = string.replace('/', '_per_').replace(' ', '_')
 
-def _replaceIllegalChar(string):
-    '''
-    This method will replace spaces (' '), slashes('/')
-    '''
-    if "current setting" in string:
-        string = string.split(' ')[-1]
-    elif "Velocity" in string:
-        string = "".join(('Gantry Speed in ', string[-1].upper(), ' Direction'))
-    elif "Position" in string:
-        string = "".join(('Position in ', string[-1].upper(), ' Direction'))
-
-    string = string.replace('/', '_per_')
-    string = string.replace(' ', '_')
     if '(' in string:
-        string = string[:string.find('(') - 1]
+        return string[:string.find('(') - 1]
     elif '[' in string:
-        string = string[:string.find('[') - 1]
+        return string[:string.find('[') - 1]
 
     return string
 
-
-def _spliter(string):
+def _generate_attr(string):
     '''
     This method will parse the string to a group of long names, short names and values
     Position and Velocity variables will be specially treated
     '''
-    long_name = str()
 
-    for members in string:
-        if members != '[':
-            long_name += members
-        else:
-            break
-
-    if 'Position' in string:
-        return [_replaceIllegalChar(long_name.strip(' ')),
-                long_name.strip(' ').split(' ')[-1]] \
-            , _UNIT_DICTIONARY[string[string.find('[') + 1:
-        string.find(']')].encode('ascii', 'ignore')]
-
-    elif 'Velocity' in string:
-        return [_replaceIllegalChar(long_name.strip(' ')),
-                _VELOCITY_DICTIONARY[long_name.strip(' ').split(' ')[-1]]] \
-            , _UNIT_DICTIONARY[string[string.find('[') + 1:
-        string.find(']')].encode('ascii', 'ignore')]
-
+    long_name = ""
+    if "current setting" in string:
+        long_name = string.split(' ')[-1]
+    elif "speed" in string and "current setting" not in string:
+        long_name = "".join(('Gantry Speed in ', string[6].upper(), ' Direction'))
+    elif "Velocity" in string or "velocity" in string:
+        long_name = "".join(('Gantry velocity in ', string[9].upper(), ' Direction'))
+    elif "Position" in string or "position" in string:
+        long_name = "".join(('Position in ', string[9].upper(), ' Direction'))
     else:
-        return _replaceIllegalChar(long_name.strip(' ')) \
-            , _replaceIllegalChar(string)
+        long_name = _reformat_string(string)
 
+    if 'Position' in string or 'position' in string:
+        return _reformat_string(string),\
+               {
+                   "units"    : _UNIT_DICTIONARY[string[string.find('[') + 1:string.find(']')]],
+                   "long_name": long_name
+               }
+    elif 'Velocity' in string or 'velocity' in string:
+        return _reformat_string(string),\
+               {
+                   "units"    : _UNIT_DICTIONARY[string[string.find('[') + 1:string.find(']')]],
+                   "long_name": long_name
+               }
+    elif 'speed' in string and "current setting" not in string:
+        return _reformat_string(string),\
+               {
+                   "units"    : _UNIT_DICTIONARY[string[string.find('[') + 1:string.find(']')]],
+                   "long_name": long_name
+               }
+    else:
+        return long_name,\
+               {
+                   "long_name": _reformat_string(string) 
+               }
+               
 
-def _filteringTheHeadings(target):
+def _filter_the_headings(target):
     '''
     A hook for json module to filter and process the useful data
     '''
@@ -367,83 +472,81 @@ def _filteringTheHeadings(target):
     return target
 
 
-def _timeStamp():
-    return time.strftime("%a %b %d %H:%M:%S %Y",  time.localtime(int(time.time())))
-
-
 def jsonHandler(jsonFile):
     '''
     pass the json object to built-in json module
     '''
     with open("".join((jsonFile[:-4],'_metadata.json'))) as fileHandler:
-        jsonCheck(fileHandler)
-        return json.loads(fileHandler.read(), object_hook=_filteringTheHeadings)
+        if _DEBUGOPT["json"]:
+            jsonCheck(fileHandler)
+        return json.loads(fileHandler.read(), object_hook=_filter_the_headings)
 
-
-def printOnVersion(prompt):
-    if _RAW_VERSION == 2:
-        exec("print prmpt")
-    else:
-        exec("print(prompt)")
-
-
-def translateTime(yearMonthDate, frameTimeString=None):
+def translate_time(yearMonthDate, frameTimeString=None):
     hourUnpack, timeUnpack = None, None
+    time_pattern      = re.compile(r'(\d{4})-(\d{2})-(\d{2})'),\
+                        re.compile(r'(\d{2})/(\d{2})/(\d{4})\s(\d{2}):(\d{2}):(\d{2})'),\
+                        re.compile(r'(\d{2}):(\d{2}):(\d{2})')
 
     if frameTimeString:
         hourUnpack = datetime.strptime(frameTimeString, "%H:%M:%S").timetuple()
-
-    if _TIME_PATTERN[1].match(yearMonthDate):
+    
+    if time_pattern[1].match(yearMonthDate):
         timeUnpack = datetime.strptime(yearMonthDate, "%m/%d/%Y %H:%M:%S").timetuple()
-    elif _TIME_PATTERN[0].match(yearMonthDate):
+    elif time_pattern[0].match(yearMonthDate):
         timeUnpack = datetime.strptime(yearMonthDate, "%Y-%m-%d").timetuple()
 
     timeSplit  = date(year=timeUnpack.tm_year, month=timeUnpack.tm_mon,
-                      day=timeUnpack.tm_mday) - _UNIX_BASETIME
+                      day=timeUnpack.tm_mday) - _UNIX_BASETIME #time period to the UNIX basetime
     if frameTimeString:
         return (timeSplit.total_seconds() + hourUnpack.tm_hour * 3600.0 + hourUnpack.tm_min * 60.0 +
                 hourUnpack.tm_sec) / (3600.0 * 24.0)
     else:
         return timeSplit.total_seconds() / (3600.0 * 24.0)
 
-
-def frameIndexParser(fileName, yearMonthDate):
+def frame_index_parser(fileName, yearMonthDate):
+    '''
+    translate all the time in *frameIndex.txt
+    '''
     with open(fileName) as fileHandler:
-        return [translateTime(yearMonthDate, dataMembers.split()[1]) for dataMembers in fileHandler.readlines()[1:]]
+        return [translate_time(yearMonthDate, dataMembers.split()[1]) for dataMembers in fileHandler.readlines()[1:]]
 
 
-def fileDependencyCheck(filePath):
+def file_dependency_check(filePath):
     '''
-    Check if the input location has all
+    Check if the input location has all 
     '''
-    key              = str()
-    illegalFileRegex = re.compile(_FILENAME_PATTERN)
+    filename_pattern = r'^(\S+)_(\w{3,10})[.](\w{3,4})$'
+    key = str()
+    illegalFileRegex = re.compile(filename_pattern)
     for roots, directorys, files in os.walk(filePath.rstrip(os.path.split(filePath)[-1])):
         for file in files:
-            if re.match(_FILENAME_PATTERN, file):
+            if re.match(filename_pattern, file):
                 key = illegalFileRegex.match(file).group(1)
-                return {"".join((key,"_frameIndex.txt")), "".join((key,"_metadata.json")), "".join((key,"_raw.hdr"))} - \
-                       set([matchFile for matchFile in files if matchFile.startswith(illegalFileRegex.match(file).group(1))])
+                return {"".join((key,"_frameIndex.txt")), "".join((key,"_metadata.json")), "".join((key,"_raw.hdr"))} -\
+                        set([matchFile for matchFile in files if matchFile.startswith(illegalFileRegex.match(file).group(1))])
+    return set()
 
 def jsonCheck(fileHandler):
     cache = list()
     for data in fileHandler.readlines():
         if ':' in data:
             if data.split(':')[0].strip() in cache:
-                printOnVersion('\033[0;31m--> Warning: Multiple keys are mapped to a single value; such illegal mapping may cause the loss of important data.\033[0m')
-                printOnVersion(''.join(('\033[0;31m--> The file path is ', fileHandler.name, ', and the key is ', data.split(':')[0].strip(), '\033[0m')))
+                print >> sys.stderr, _WARN_MSG.format(msg='WARNING: Duplicate keys mapped to different values; such illegal mapping may cause data loss')
+                print >> sys.stderr, ''.join(('Duplicated key is ', data.split(':')[0].strip(), ' in file ', fileHandler.name))
             cache.append(data.split(':')[0].strip())
 
-    fileHandler.seek(0)
+    fileHandler.seek(0) #Reset the file read ptr
 
-def writeHeaderFile(fileName, netCDFHandler):
+
+def write_header_file(fileName, netCDFHandler):
     '''
     The main function, reading the data and exporting netCDF file
     '''
     if not getDimension(fileName):
+        print >> sys.stderr, "ERROR: Cannot get dimension infos from", "".join((fileName, '.hdr'))
         return
     dimensionWavelength, dimensionX, dimensionY = getDimension(fileName)
-    hdrInfo = getHeaderInfo(fileName)
+    hdrInfo = get_header_info(fileName)
 
     # netCDFHandler.createDimension('wavelength',       dimensionWavelength)
     # netCDFHandler.createDimension('x',          dimensionX)
@@ -471,37 +574,53 @@ def writeHeaderFile(fileName, netCDFHandler):
     for members in hdrInfo:
         if members == 'default bands':
             threeColorBands = [int(bands) for bands in eval(hdrInfo[members])]
-        setattr(headerInfo, _replaceIllegalChar(members), hdrInfo[members])
+        setattr(headerInfo, _reformat_string(members), hdrInfo[members])
 
     try:
-        headerInfo.createVariable(
-                'red_band_index', 'f8').assignValue(threeColorBands[0])
-        headerInfo.createVariable(
-                'green_band_index', 'f8').assignValue(threeColorBands[1])
-        headerInfo.createVariable(
-                'blue_band_index', 'f8').assignValue(threeColorBands[2])
+        headerInfo.createVariable('red_band_index', 'u2')[...]   = threeColorBands[0]
+        setattr(netCDFHandler.groups['header_info'].variables['red_band_index'],
+                'long_name', 'Index of red band used for RGB composite')
+
+        headerInfo.createVariable('green_band_index', 'u2')[...] = threeColorBands[1]
+        setattr(netCDFHandler.groups['header_info'].variables['green_band_index'],
+                'long_name', 'Index of green band used for RGB composite')
+
+        headerInfo.createVariable('blue_band_index', 'u2')[...]  = threeColorBands[2]
+        setattr(netCDFHandler.groups['header_info'].variables['blue_band_index'],
+                'long_name', 'Index of blue band used for RGB composite')
 
         setattr(netCDFHandler.groups['sensor_variable_metadata'].variables[
-                    'exposure'], 'red_band_index',   threeColorBands[0])
+                'exposure'], 'red_band_index',   threeColorBands[0])
         setattr(netCDFHandler.groups['sensor_variable_metadata'].variables[
-                    'exposure'], 'green_band_index', threeColorBands[1])
+                'exposure'], 'green_band_index', threeColorBands[1])
         setattr(netCDFHandler.groups['sensor_variable_metadata'].variables[
-                    'exposure'], 'blue_band_index',  threeColorBands[2])
+                'exposure'], 'blue_band_index',  threeColorBands[2])
+        # blue_band_index long_name = 'Index of blue band used for RGB composite'
+        
     except:
-        printOnVersion(
-                'Warning: default_band variable in the header file is missing.')
+        if _DEBUGOPT["json"]:
+            print >> sys.stderr, _WARN_MSG.format(msg='WARNING: default_band variable in the header file is missing.')
 
+def main():
+    assert len(sys.argv) >= 3, "Please make sure you have enough arguments! (sourcefile, camera_option, [debug_option,] fileInput, fileoutput)"
 
-if __name__ == '__main__':
-    fileInput, fileOutput = sys.argv[1], sys.argv[2]
-    missingFiles = fileDependencyCheck(fileInput)
+    if len(sys.argv) >= 4:
+        debug_option = sys.argv[-3].split("=")[-1].split(",")
+        for members in debug_option:
+            _DEBUGOPT[members] = True
+
+    fileInput, fileOutput = sys.argv[-2], sys.argv[-1]
+    missingFiles = file_dependency_check(fileInput)
     if len(missingFiles) > 0:
-        printOnVersion("\033[0;31mOne or more important file(s) is(are) missing. Program terminated:\033[0m")
+        print >> sys.stderr, _WARN_MSG.format(msg="One or more important file(s) is(are) missing. Program terminated")
 
         for missingFile in missingFiles:
-            printOnVersion("".join(("\033[0;31m",missingFile," is missing\033[0m")))
+            print >> sys.stderr, "".join((missingFile," is missing"))
         exit()
 
     testCase = jsonHandler(fileInput)
     testCase.writeToNetCDF(fileInput, fileOutput, " ".join((fileInput, fileOutput)))
-    printOnVersion('\033[0;31mDone.\033[0m')
+
+
+if __name__ == '__main__':
+    main()

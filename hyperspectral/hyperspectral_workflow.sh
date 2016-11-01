@@ -44,8 +44,8 @@ if [ -z "${HOSTNAME}" ]; then
     fi # !hostname
 fi # HOSTNAME
 # Ensure batch jobs access correct executables and libraries for python, mpirun, netCDF, and NCO:
-case "${HOSTNAME}" in
-    cg-gpu* )
+case "${HOSTNAME}" in 
+    cg-gpu* | cg-cmp* ) # Roger login nodes named "cg-gpu*", compute nodes named "cg-cmp*"
 	module add gdal-stack-2.7.10 # 20160422: /usr/bin/python is version 2.6.6. Must load Python 2.7+
 	module add netcdf nco # hyperspectral_workflow.sh requires NCO version 4.6.0 (dated 20160401) or later
 	# Following two lines guarantee use of latest NCO executables Zender's directories:
@@ -54,17 +54,23 @@ case "${HOSTNAME}" in
 esac # !HOSTNAME
 
 # Production
-# UIUC: ls -R /projects/arpae/terraref/sites/ua-mac/raw_data/VNIR/2016-04-07/*/*_raw | hyperspectral_workflow.sh -d 1 -O /gpfs_scratch/arpae/imaging_spectrometer > ~/terraref.out 2>&1 &
+# UIUC: ls -R /projects/arpae/terraref/sites/ua-mac/raw_data/VNIR/2016-04-07/*/*_raw | hyperspectral_workflow.sh -d 1 -O /gpfs_scratch/arpae/imaging_spectrometer > ~/hyperspectral.out 2>&1 & # Process all images from one day
 # UIUC: hyperspectral_workflow.sh -d 1 -i /projects/arpae/terraref/sites/ua-mac/raw_data/SWIR/2016-06-28/2016-06-28__09-10-16-386/a33641c2-8a1e-4a63-9d33-ab66717d6b8a_raw
-# UCI:  ls -R ${DATA}/terraref/MovingSensor/VNIR/2016-04-07/*/*_raw | hyperspectral_workflow.sh -d 1 -O ~/rgr > ~/terraref.out 2>&1 &
+# UIUC: hyperspectral_workflow.sh -d 1 -i /projects/arpae/terraref/sites/ua-mac/raw_data/VNIR/2016-10-06/2016-10-06__15-21-20-178/b73a4f00-4140-4576-8c70-8e1d26ae245e_raw # Process small-scan (~516 MB raw image)
+# UIUC: qsub -I -A arpae -l walltime=00:60:00 -N hyperspectral -q devel # Interactive dedicated compute node in devel queue (1 hr max, insufficient for raw >= 62 GB)
+#       qsub -I -A arpae -l walltime=03:00:00 -N hyperspectral -q batch # Interactive dedicated compute node in batch queue (48 hr max)
+#       echo "hyperspectral_workflow.sh -d 1 -i /projects/arpae/terraref/sites/ua-mac/raw_data/VNIR/2016-10-07/2016-10-07__12-12-09-294/755e5eca-55b7-4412-a145-e8d1d4833b3f_raw" > ~/hyperspectral.pbs;chmod a+x ~/hyperspectral.pbs
+#       qsub -I -A arpae -l walltime=03:00:00 -N hyperspectral -q batch -j oe -m e -o ~/hyperspectral.out ~/hyperspectral.pbs
+#       hyperspectral_workflow.sh -d 1 -i /projects/arpae/terraref/sites/ua-mac/raw_data/VNIR/2016-10-07/2016-10-07__12-12-09-294/755e5eca-55b7-4412-a145-e8d1d4833b3f_raw > ~/foo 2>&1 & # Process full-scan (~62 GB raw image)
+# UCI:  ls -R ${DATA}/terraref/MovingSensor/VNIR/2016-04-07/*/*_raw | hyperspectral_workflow.sh -d 1 -O ~/rgr > ~/hyperspectral.out 2>&1 &
 
 # Test cases (for Charlie's machines)
-# hyperspectral_workflow.sh $fl > ~/terraref.out 2>&1 &
+# hyperspectral_workflow.sh $fl > ~/hyperspectral.out 2>&1 &
 
 # Debugging and Benchmarking:
-# hyperspectral_workflow.sh -d 1 -i ${DATA}/terraref/whiteReference_raw -o whiteReference.nc -O ~/rgr > ~/terraref.out 2>&1 &
-# hyperspectral_workflow.sh -d 1 -i ${DATA}/terraref/MovingSensor/SWIR/2016-03-05/2016-03-05__09-46_17_450/8d54accb-0858-4e31-aaac-e021b31f3188_raw -o foo.nc -O ~/rgr > ~/terraref.out 2>&1 &
-# hyperspectral_workflow.sh -d 1 -i ${DATA}/terraref/MovingSensor/VNIR/2016-03-05/2016-03-05__09-46_17_450/72235cd1-35d5-480a-8443-14281ded1a63_raw -o foo.nc -O ~/rgr > ~/terraref.out 2>&1 &
+# hyperspectral_workflow.sh -d 1  -i ${DATA}/terraref/whiteReference_raw -o whiteReference.nc -O ~/rgr > ~/hyperspectral.out 2>&1 &
+# hyperspectral_workflow.sh -d 1  -i ${DATA}/terraref/MovingSensor/SWIR/2016-03-05/2016-03-05__09-46_17_450/8d54accb-0858-4e31-aaac-e021b31f3188_raw -o foo.nc -O ~/rgr > ~/hyperspectral.out 2>&1 &
+# hyperspectral_workflow.sh -d 1 -i ${DATA}/terraref/VNIR/2016-10-06/2016-10-06__15-21-20-178/b73a4f00-4140-4576-8c70-8e1d26ae245e_raw -o foo.nc -O ~/rgr > ~/hyperspectral.out 2>&1 &
 
 # dbg_lvl: 0 = Quiet, print basic status during evaluation
 #          1 = Print configuration, full commands, and status to output during evaluation
@@ -173,12 +179,12 @@ function fnc_usg_prn { # NB: dash supports fnc_nm (){} syntax, not function fnc_
     printf "          ${fnt_bld}$spt_nm -c 2 -i ${in_xmp} -O ${drc_out_xmp} ${fnt_nrm}\n"
     printf "          ${fnt_bld}$spt_nm -N bil -i ${in_xmp} -O ${drc_out_xmp} ${fnt_nrm}\n"
     printf "CZ Debug: ${fnt_bld}ls \${DATA}/terraref/*_raw | $spt_nm -O ~/rgr ${fnt_nrm}\n"
-    printf "          ${spt_nm} -i \${DATA}/terraref/whiteReference_raw -O \${DATA}/terraref > ~/terraref.out 2>&1 &\n"
-    printf "          ${spt_nm} -I \${DATA}/terraref -O \${DATA}/terraref > ~/terraref.out 2>&1 &\n"
-    printf "          ${spt_nm} -I \${DATA}/terraref > ~/terraref.out 2>&1 &\n"
-    printf "          ${spt_nm} -I /projects/arpae/terraref/raw_data/lemnatec_field -O /projects/arpae/terraref/outputs/lemnatec_field > ~/terraref.out 2>&1 &\n"
-    printf "          ${spt_nm} -i \${DATA}/terraref/MovingSensor/SWIR/2016-03-05/2016-03-05__09-46_17_450/8d54accb-0858-4e31-aaac-e021b31f3188_raw -o foo.nc -O ~/rgr > ~/terraref.out 2>&1 &\n"
-    printf "          ${spt_nm} -i \${DATA}/terraref/MovingSensor/VNIR/2016-03-05/2016-03-05__09-46_17_450/72235cd1-35d5-480a-8443-14281ded1a63_raw -o foo.nc -O ~/rgr > ~/terraref.out 2>&1 &\n"
+    printf "          ${spt_nm} -i \${DATA}/terraref/whiteReference_raw -O \${DATA}/terraref > ~/hyperspectral.out 2>&1 &\n"
+    printf "          ${spt_nm} -I \${DATA}/terraref -O \${DATA}/terraref > ~/hyperspectral.out 2>&1 &\n"
+    printf "          ${spt_nm} -I \${DATA}/terraref > ~/hyperspectral.out 2>&1 &\n"
+    printf "          ${spt_nm} -I /projects/arpae/terraref/raw_data/lemnatec_field -O /projects/arpae/terraref/outputs/lemnatec_field > ~/hyperspectral.out 2>&1 &\n"
+    printf "          ${spt_nm} -i \${DATA}/terraref/MovingSensor/SWIR/2016-03-05/2016-03-05__09-46_17_450/8d54accb-0858-4e31-aaac-e021b31f3188_raw -o foo.nc -O ~/rgr > ~/hyperspectral.out 2>&1 &\n"
+    printf "          ${spt_nm} -i \${DATA}/terraref/MovingSensor/VNIR/2016-03-05/2016-03-05__09-46_17_450/72235cd1-35d5-480a-8443-14281ded1a63_raw -o foo.nc -O ~/rgr > ~/hyperspectral.out 2>&1 &\n"
     exit 1
 } # end fnc_usg_prn()
 
@@ -192,7 +198,7 @@ fi # !arg_nbr
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 # http://tuxtweaks.com/2014/05/bash-getopts
 cmd_ln="${spt_nm} ${@}"
-while getopts c:d:I:i:j:N:n:O:o:p:T:t:u:x OPT; do
+while getopts c:d:C:I:i:j:N:n:O:o:p:T:t:u:x OPT; do
     case ${OPT} in
 	c) dfl_lvl=${OPTARG} ;; # Compression deflate level
 	d) dbg_lvl=${OPTARG} ;; # Debugging level
@@ -272,34 +278,34 @@ if [ -z "${drc_in}" ]; then
 else # !drc_in
     drc_in_usr_flg='Yes'
 fi # !drc_in
-if [ -n "${job_usr}" ]; then
+if [ -n "${job_usr}" ]; then 
     job_nbr="${job_usr}"
 fi # !job_usr
 if [ ${dbg_lvl} -ge 2 ]; then
     nco_opt="-D ${dbg_lvl} ${nco_opt}"
 fi # !dbg_lvl
-if [ -n "${nco_usr}" ]; then
+if [ -n "${nco_usr}" ]; then 
     nco_opt="${nco_usr} ${nco_opt}"
 fi # !var_lst
-if [ -n "${gaa_sng}" ]; then
+if [ -n "${gaa_sng}" ]; then 
     nco_opt="${nco_opt} ${gaa_sng}"
 fi # !var_lst
-if [ -n "${hdr_pad}" ]; then
+if [ -n "${hdr_pad}" ]; then 
     nco_opt="${nco_opt} --hdr_pad=${hdr_pad}"
 fi # !hdr_pad
-if [ -n "${out_fl}" ]; then
+if [ -n "${out_fl}" ]; then 
     out_usr_flg='Yes'
 fi # !out_fl
 if [ -n "${par_typ}" ]; then
-    if [ "${par_typ}" != 'bck' ] && [ "${par_typ}" != 'mpi' ] && [ "${par_typ}" != 'nil' ]; then
+    if [ "${par_typ}" != 'bck' ] && [ "${par_typ}" != 'mpi' ] && [ "${par_typ}" != 'nil' ]; then 
 	    echo "ERROR: Invalid -p par_typ option = ${par_typ}"
 	    echo "HINT: Valid par_typ arguments are 'bck', 'mpi', and 'nil'"
 	    exit 1
     fi # !par_typ
 fi # !par_typ
-if [ "${par_typ}" = 'bck' ]; then
+if [ "${par_typ}" = 'bck' ]; then 
     par_opt=' &'
-elif [ "${par_typ}" = 'mpi' ]; then
+elif [ "${par_typ}" = 'mpi' ]; then 
     mpi_flg='Yes'
     par_opt=' &'
 fi # !par_typ
@@ -313,7 +319,7 @@ else # !in_fl
     # Detecting input on stdin:
     # http://stackoverflow.com/questions/2456750/detect-presence-of-stdin-contents-in-shell-script
     # ls *_raw | hyperspectral_workflow.sh -D 1 -O ~/rgr
-    if [ -t 0 ]; then
+    if [ -t 0 ]; then 
 	if [ "${drc_in_usr_flg}" = 'Yes' ]; then
 	    for fl in "${drc_in}"/*_raw ; do
 		if [ -f "${fl}" ]; then
@@ -321,13 +327,13 @@ else # !in_fl
 		    let fl_nbr=${fl_nbr}+1
 		fi # !file
 	    done
-	    if [ "${fl_nbr}" -eq 0 ]; then
+	    if [ "${fl_nbr}" -eq 0 ]; then 
 		echo "ERROR: Input directory specified with -I contains no *_raw files"
 		echo "HINT: Pipe file list to script via stdin with, e.g., 'ls *_raw | ${spt_nm}'"
 		exit 1
 	    fi # !fl_nbr
 	else # !drc_in
-	    if [ "${mtd_mk}" != 'Yes' ]; then
+	    if [ "${mtd_mk}" != 'Yes' ]; then 
 		echo "ERROR: Must specify input file with -i, with stdin, or directory of *_raw files with -I"
 		echo "HINT: Pipe file list to script via stdin with, e.g., 'ls *_raw | ${spt_nm}'"
 		exit 1
@@ -343,18 +349,18 @@ else # !in_fl
 fi # !in_fl
 
 if [ "${mpi_flg}" = 'Yes' ]; then
-    if [ -n "${COBALT_NODEFILE}" ]; then
+    if [ -n "${COBALT_NODEFILE}" ]; then 
 	nd_fl="${COBALT_NODEFILE}"
-    elif [ -n "${PBS_NODEFILE}" ]; then
+    elif [ -n "${PBS_NODEFILE}" ]; then 
 	nd_fl="${PBS_NODEFILE}"
-    elif [ -n "${SLURM_NODELIST}" ]; then
+    elif [ -n "${SLURM_NODELIST}" ]; then 
 	nd_fl="${SLURM_NODELIST}"
     else
 	echo "ERROR: MPI job unable to find node list"
 	echo "HINT: ${spt_nm} uses first node list found in \$COBALT_NODEFILE (= \"${COBALT_NODEFILE}\"), \$PBS_NODEFILE (= \"${PBS_NODEFILE}\"), \$SLURM_NODELIST (= \"${SLURM_NODELIST}\")"
 	exit 1
     fi # !PBS
-    if [ -n "${nd_fl}" ]; then
+    if [ -n "${nd_fl}" ]; then 
 	# NB: nodes are 0-based, e.g., [0..11]
 	nd_idx=0
 	for nd in `cat ${nd_fl} | uniq` ; do
@@ -363,7 +369,7 @@ if [ "${mpi_flg}" = 'Yes' ]; then
 	done # !nd
 	nd_nbr=${#nd_nm[@]}
 	for ((fl_idx=0;fl_idx<fl_nbr;fl_idx++)); do
-	    case "${HOSTNAME}" in
+	    case "${HOSTNAME}" in 
 		cori* | edison* | nid* )
 		    # NB: NERSC staff says srun automatically assigns to unique nodes even without "-L $node" argument?
 		    cmd_mpi[${fl_idx}]="srun -L ${nd_nm[$((${fl_idx} % ${nd_nbr}))]} -n 1" ; ;; # NERSC
@@ -380,10 +386,10 @@ if [ "${mpi_flg}" = 'Yes' ]; then
 	    cmd_mpi[${fl_idx}]=""
 	done # !fl_idx
     fi # !pbs
-    if [ -z "${job_usr}" ]; then
+    if [ -z "${job_usr}" ]; then 
 	job_nbr=${nd_nbr}
     fi # !job_usr
-    if [ -z "${thr_usr}" ]; then
+    if [ -z "${thr_usr}" ]; then 
 	if [ -n "${PBS_NUM_PPN}" ]; then
 #	NB: use export OMP_NUM_THREADS when thr_nbr > 8
 #	thr_nbr=${PBS_NUM_PPN}
@@ -395,6 +401,7 @@ fi # !mpi
 # Print initial state
 if [ ${dbg_lvl} -ge 2 ]; then
     printf "dbg: cln_flg  = ${cln_flg}\n"
+	printf "dbg: cam_opt  = ${cam_opt}\n"
     printf "dbg: dbg_lvl  = ${dbg_lvl}\n"
     printf "dbg: drc_in   = ${drc_in}\n"
     printf "dbg: drc_nco  = ${drc_nco}\n"
@@ -450,8 +457,8 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
     fi # !basename
     idx_prn=`printf "%02d" ${fl_idx}`
     printf "Input #${idx_prn}: ${in_fl}\n"
-    if [ "${out_usr_flg}" = 'Yes' ]; then
-	if [ ${fl_nbr} -ge 2 ]; then
+    if [ "${out_usr_flg}" = 'Yes' ]; then 
+	if [ ${fl_nbr} -ge 2 ]; then 
 	    echo "ERROR: Single output filename specified with -o for multiple input files"
 	    echo "HINT: For multiple input files use -O option to specify output directory and do not use -o option. Output files will have same name as input files, but will be in different directory."
 	    exit 1
@@ -520,7 +527,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	att_in=${fl_in[$fl_idx]/_raw/_raw.nc}
 	hst_att="`date`: ${cmd_ln};Skipped translation step"
     fi # !trn_flg
-
+    
     # Add workflow-specific metadata
     if [ "${att_flg}" = 'Yes' ]; then
 	att_out="${att_fl}.fl${idx_prn}.tmp"
@@ -538,14 +545,19 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	    fi # !err
 	fi # !dbg
     fi # !att_flg
-
+    
     # Parse metadata from JSON to netCDF (sensor location, instrument configuration)
     if [ "${jsn_flg}" = 'Yes' ]; then
 	jsn_in="${fl_in[${fl_idx}]}"
 	jsn_out="${jsn_fl}.fl${idx_prn}.tmp"
 	printf "jsn(in)  : ${jsn_in}\n"
 	printf "jsn(out) : ${jsn_fl}\n"
-	cmd_jsn[${fl_idx}]="python ${drc_spt}/hyperspectral_metadata.py ${jsn_in} ${jsn_out}"
+
+	dbg_cmd="dbg=json"
+	if [ ${dbg_lvl} = 3 ]; then
+		dbg_cmd=${dbg_cmd}",latlng,graph"
+	fi # !dbg setting for metadata
+	cmd_jsn[${fl_idx}]="python ${drc_spt}/hyperspectral_metadata.py ${dbg_cmd} ${jsn_in} ${jsn_out}"
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_jsn[${fl_idx}]}
 	fi # !dbg
@@ -576,7 +588,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	    fi # !err
 	fi # !dbg
     fi # !mrg_flg
-
+    
     # Calibrate
     if [ "${clb_flg}" = 'Yes' ]; then
 	clb_in=${mrg_out}
@@ -664,7 +676,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	printf "2D  : ${anl_in}\n"
 	printf "3D  : ${anl_out}\n"
 	cmd_anl[${fl_idx}]="${cmd_mpi[${fl_idx}]} ncap2 -4 -v -O -s \*wvl_nbr=${wvl_nbr} -S ${drc_spt}/new_analysis.nco ${anl_in} ${anl_out}"
-
+	
 	# Block 5 Loop 2: Execute and/or echo commands
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_anl[${fl_idx}]}
@@ -681,7 +693,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 		anl_pid[${fl_idx}]=$!
 	    fi # !par_typ
 	fi # !dbg
-
+	
 	# Block 6: Wait
 	# Parallel processing (both Background and MPI) spawn simultaneous processes in batches of ${job_nbr}
 	# Once ${job_nbr} jobs are running, wait() for all to finish before issuing another batch
@@ -704,7 +716,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	    fi # !bch_flg
 	fi # !par_typ
     fi # !0
-
+    
 done # !fl_idx
 
 # 20160330: Entire block made obsolete by ncks conversion capability

@@ -45,21 +45,24 @@ GOOGLE_MAP_TEMPLATE = "https://maps.googleapis.com/maps/api/staticmap?size=1280x
 
 ORIENTATION_MATRIX = np.array([[CAMERA_FOCAL_LENGTH / PIXEL_PITCH, GAMMA, 0], [0, CAMERA_FOCAL_LENGTH / PIXEL_PITCH, 0 ], [0, 0, 1]])
 
-def pixel2Geographic(jsonFileLocation, headerFileLocation):
+def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption):
 
     ######################### Load necessary data #########################
     with open(jsonFileLocation) as fileHandler:
         master = json.loads(fileHandler.read())["lemnatec_measurement_metadata"]
-
+        
         x_gantry_pos = float(master["gantry_system_variable_metadata"]["position x [m]"])
         y_gantry_pos = float(master["gantry_system_variable_metadata"]["position y [m]"])
 
         x_camera_pos = 1.9 # From https://github.com/terraref/reference-data/issues/32
         y_camera_pos = 0.855
 
-        x_pixel_size = y_pixel_size = 0.98526434004512529576754637665e-3
+        if cameraOption == "SWIR":
+            x_pixel_size = 1.930615052e-3
+        else:
+            x_pixel_size = 1.025e-3
 
-        x_pixel_num, y_pixel_num = 0, 0 #placeholder for x and y pixel numbers
+        y_pixel_size = 0.98526434004512529576754637665e-3
 
         with open(headerFileLocation) as fileHandler:
             overall = fileHandler.readlines()
@@ -67,7 +70,7 @@ def pixel2Geographic(jsonFileLocation, headerFileLocation):
             for members in overall:
                 if "width" in members:
                     x_pixel_num = int(members.split("=")[-1].strip("\n"))
-                elif "height" in members:
+                elif "lines" in members:
                     y_pixel_num = int(members.split("=")[-1].strip("\n"))
 
 
