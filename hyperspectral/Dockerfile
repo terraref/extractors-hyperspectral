@@ -95,7 +95,7 @@ RUN cd ${USERHOME} && \
     . pyenv/bin/activate && \
     pip install pika urllib3 requests && \
     CC=gcc CXX=g++ USE_SETUPCFG=0 HDF5_INCDIR=/srv/sw/hdf5-1.8.17/include HDF5_LIBDIR=/srv/sw/hdf5-1.8.17/lib NETCDF4_INCDIR=/srv/sw/netcdf-4.4.1/include NETCDF4_LIBDIR=/srv/sw/netcdf-4.4.1/lib pip install netCDF4 && \
-    pip install git+https://opensource.ncsa.illinois.edu/stash/scm/cats/pyclowder.git@local-mount-path-downloading && \
+    pip install git+https://opensource.ncsa.illinois.edu/stash/scm/cats/pyclowder.git && \
     deactivate
 
 ## create workspace directories
