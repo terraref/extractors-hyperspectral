@@ -9,7 +9,7 @@
 # https://github.com/terraref/computing-pipeline/issues/88 # Calibration employed until 20160908
 
 # Prerequisites:
-# NCO version 4.6.0 (dated 20160401) or later
+# NCO version 4.6.2 (dated 20161116) or later
 # Python: Python 2.7.X or 3.X (preferred) with netCDF4 module
 # hyperspectral_workflow.sh, hyperspectral_calibration.nco, hyperspectral_metadata.py and environmental_logger_json2netcdf.py must be in same directory
 
@@ -47,10 +47,14 @@ fi # HOSTNAME
 case "${HOSTNAME}" in 
     cg-gpu* | cg-cmp* ) # Roger login nodes named "cg-gpu*", compute nodes named "cg-cmp*"
 	module add gdal-stack-2.7.10 # 20160422: /usr/bin/python is version 2.6.6. Must load Python 2.7+
-	module add netcdf nco # hyperspectral_workflow.sh requires NCO version 4.6.0 (dated 20160401) or later
-	# Following two lines guarantee use of latest NCO executables Zender's directories:
-	#       export PATH='/home/zender/bin'\:${PATH}
-	#	export LD_LIBRARY_PATH='/home/zender/lib'\:${LD_LIBRARY_PATH} ; ;;
+	module add netcdf # hyperspectral_workflow.sh requires NCO version 4.6.2 (dated 20161116) or later
+	if [ -n "${USER}" ] && [ ${USER} = 'zender' ] ; then
+	    # Following two lines guarantee use of latest NCO executables Zender's directories:
+	    export PATH='/home/zender/bin'\:${PATH}
+	    export LD_LIBRARY_PATH='/home/zender/lib'\:${LD_LIBRARY_PATH}
+	else
+	    module add nco # hyperspectral_workflow.sh requires NCO version 4.6.2 (dated 20161116) or later
+	fi
 esac # !HOSTNAME
 
 # Production
@@ -60,7 +64,7 @@ esac # !HOSTNAME
 # UIUC: qsub -I -A arpae -l walltime=00:60:00 -N hyperspectral -q devel # Interactive dedicated compute node in devel queue (1 hr max, insufficient for raw >= 62 GB)
 #       qsub -I -A arpae -l walltime=03:00:00 -N hyperspectral -q batch # Interactive dedicated compute node in batch queue (48 hr max)
 #       echo "hyperspectral_workflow.sh -d 1 -i /projects/arpae/terraref/sites/ua-mac/raw_data/VNIR/2016-10-07/2016-10-07__12-12-09-294/755e5eca-55b7-4412-a145-e8d1d4833b3f_raw" > ~/hyperspectral.pbs;chmod a+x ~/hyperspectral.pbs
-#       qsub -I -A arpae -l walltime=03:00:00 -N hyperspectral -q batch -j oe -m e -o ~/hyperspectral.out ~/hyperspectral.pbs
+#       qsub -A arpae -l walltime=03:00:00 -l nodes=1 -N hyperspectral -q batch -j oe -m e -o ~/hyperspectral.out ~/hyperspectral.pbs # Dedicated non-interactive compute node in batch queue in batch mode
 #       hyperspectral_workflow.sh -d 1 -i /projects/arpae/terraref/sites/ua-mac/raw_data/VNIR/2016-10-07/2016-10-07__12-12-09-294/755e5eca-55b7-4412-a145-e8d1d4833b3f_raw > ~/foo 2>&1 & # Process full-scan (~62 GB raw image)
 # UCI:  ls -R ${DATA}/terraref/MovingSensor/VNIR/2016-04-07/*/*_raw | hyperspectral_workflow.sh -d 1 -O ~/rgr > ~/hyperspectral.out 2>&1 &
 
@@ -68,9 +72,9 @@ esac # !HOSTNAME
 # hyperspectral_workflow.sh $fl > ~/hyperspectral.out 2>&1 &
 
 # Debugging and Benchmarking:
-# hyperspectral_workflow.sh -d 1  -i ${DATA}/terraref/whiteReference_raw -o whiteReference.nc -O ~/rgr > ~/hyperspectral.out 2>&1 &
-# hyperspectral_workflow.sh -d 1  -i ${DATA}/terraref/MovingSensor/SWIR/2016-03-05/2016-03-05__09-46_17_450/8d54accb-0858-4e31-aaac-e021b31f3188_raw -o foo.nc -O ~/rgr > ~/hyperspectral.out 2>&1 &
-# hyperspectral_workflow.sh -d 1 -i ${DATA}/terraref/VNIR/2016-10-06/2016-10-06__15-21-20-178/b73a4f00-4140-4576-8c70-8e1d26ae245e_raw -o foo.nc -O ~/rgr > ~/hyperspectral.out 2>&1 &
+# hyperspectral_workflow.sh -d 1 -i ${DATA}/terraref/hyperspectral_tst_raw -o ~/hyperspectral_tst.nc > ~/hyperspectral.out 2>&1 &
+# hyperspectral_workflow.sh -d 1 -i ${DATA}/terraref/SWIR/2016-03-05/2016-03-05__09-46_17_450/8d54accb-0858-4e31-aaac-e021b31f3188_raw -o ~/foo.nc > ~/hyperspectral.out 2>&1 &
+# hyperspectral_workflow.sh -d 1 -i ${DATA}/terraref/VNIR/2016-10-06/2016-10-06__15-21-20-178/b73a4f00-4140-4576-8c70-8e1d26ae245e_raw -o ~/foo.nc > ~/hyperspectral.out 2>&1 &
 
 # dbg_lvl: 0 = Quiet, print basic status during evaluation
 #          1 = Print configuration, full commands, and status to output during evaluation
@@ -108,6 +112,8 @@ drc_in='' # [sng] Input file directory
 drc_in_xmp='drc_in' # [sng] Input file directory for examples
 drc_out="${drc_pwd}" # [sng] Output file directory
 drc_out_xmp='drc_out' # [sng] Output file directory for examples
+flg_swir='No' # [flg] SWIR camera
+flg_vnir='No' # [flg] VNIR camera
 gaa_sng="--gaa terraref_script=${spt_nm} --gaa terraref_hostname=${HOSTNAME} --gaa terraref_version=${nco_vrs}" # [sng] Global attributes to add
 hdr_pad='10000' # [B] Pad at end of header section
 in_fl='' # [sng] Input file stub
@@ -116,8 +122,8 @@ fl_nbr=0 # [nbr] Number of files
 job_nbr=6 # [nbr] Job simultaneity for parallelism
 mpi_flg='No' # [sng] Parallelize over nodes
 mtd_mk='Yes' # [sng] Process metadata
-nco_opt='-O --no_tmp_fl' # [sng] NCO defaults (e.g., '-O -6 -t 1')
-nco_usr='' # [sng] NCO user-configurable options (e.g., '-D 1')
+nco_opt='' # [sng] NCO defaults (e.g., '-D 1')
+nco_usr='' # [sng] NCO user-configurable options (e.g., '-D 2')
 nd_nbr=1 # [nbr] Number of nodes
 ntl_out='bsq' # [enm] Interleave-type of output
 out_fl='' # [sng] Output file name
@@ -287,9 +293,6 @@ fi # !dbg_lvl
 if [ -n "${nco_usr}" ]; then 
     nco_opt="${nco_usr} ${nco_opt}"
 fi # !var_lst
-if [ -n "${gaa_sng}" ]; then 
-    nco_opt="${nco_opt} ${gaa_sng}"
-fi # !var_lst
 if [ -n "${hdr_pad}" ]; then 
     nco_opt="${nco_opt} --hdr_pad=${hdr_pad}"
 fi # !hdr_pad
@@ -401,7 +404,6 @@ fi # !mpi
 # Print initial state
 if [ ${dbg_lvl} -ge 2 ]; then
     printf "dbg: cln_flg  = ${cln_flg}\n"
-	printf "dbg: cam_opt  = ${cam_opt}\n"
     printf "dbg: dbg_lvl  = ${dbg_lvl}\n"
     printf "dbg: drc_in   = ${drc_in}\n"
     printf "dbg: drc_nco  = ${drc_nco}\n"
@@ -419,7 +421,7 @@ if [ ${dbg_lvl} -ge 2 ]; then
     printf "dbg: par_typ  = ${par_typ}\n"
     printf "dbg: spt_pid  = ${spt_pid}\n"
     printf "dbg: unq_sfx  = ${unq_sfx}\n"
-    printf "Asked to process ${fl_nbr} files:\n"
+    printf "Asked to process ${fl_nbr} file(s):\n"
     for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	printf "${fl_in[${fl_idx}]}\n"
     done # !fl_idx
@@ -499,18 +501,30 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	# NCO is much faster, and creates a "data cube" directory so no reassembly required
 	# Collect metadata necessary to process image from header
 	hdr_fl=${fl_in[${fl_idx}]/_raw/_raw.hdr}
-	# tr strips invisible and vexing DOS ^M characters from line
+	mtd_fl=${fl_in[${fl_idx}]/_raw/_metadata.json}
+	# tr strips invisible, vexing DOS ^M characters from line
 	wvl_nbr=$(grep '^bands' ${hdr_fl} | cut -d ' ' -f 3 | tr -d '\015')
 	xdm_nbr=$(grep '^samples' ${hdr_fl} | cut -d ' ' -f 3 | tr -d '\015')
 	ydm_nbr=$(grep '^lines' ${hdr_fl} | cut -d ' ' -f 3 | tr -d '\015')
 	ntl_in=$(grep '^interleave' ${hdr_fl} | cut -d ' ' -f 3 | tr -d '\015')
 	typ_in_ENVI=$(grep '^data type' ${hdr_fl} | cut -d ' ' -f 4 | tr -d '\015')
+	xps_tm=$(grep 'current setting exposure' ${mtd_fl} | cut -d ':' -f 2 | tr -d '" ,\015' )
+	fl_clb="${drc_spt}/calibration_vnir_${xps_tm}ms.nc"
+	if [ "${wvl_nbr}" -eq 272 ]; then 
+	    flg_swir='Yes' # [flg] SWIR camera
+	elif [ "${wvl_nbr}" -eq 955 ]; then 
+	    flg_vnir='Yes' # [flg] VNIR camera
+	else
+	    echo "ERROR: Unable to identify camera type (SWIR or VNIR?)"
+	    echo "HINT: ${spt_nm} requires header file ${fl_hdr} to report either 272 (SWIR) or 955 (VNIR) or wavelengths. Actual number reported = wvl_nbr = ${wvl_nbr}."
+	    exit 1
+	fi # !wvl_nbr
 	case "${typ_in_ENVI}" in
 	    4 ) typ_in='NC_FLOAT' ; ;;
 	    12 ) typ_in='NC_USHORT' ; ;;
 	    * ) printf "${spt_nm}: ERROR Unknown typ_in in ${hdr_fl}. Debug grep command.\n" ; exit 1 ; ;; # Other
 	esac # !typ_in_ENVI
-	cmd_trn[${fl_idx}]="ncks -O --trr_wxy=${wvl_nbr},${xdm_nbr},${ydm_nbr} --trr typ_in=${typ_in} --trr typ_out=${typ_out} --trr ntl_in=${ntl_in} --trr ntl_out=${ntl_out} --trr_in=${trn_in} ${drc_spt}/hyperspectral_dummy.nc ${trn_out}"
+	cmd_trn[${fl_idx}]="ncks -O ${nco_opt} --no_tmp_fl --trr_wxy=${wvl_nbr},${xdm_nbr},${ydm_nbr} --trr typ_in=${typ_in} --trr typ_out=${typ_out} --trr ntl_in=${ntl_in} --trr ntl_out=${ntl_out} --trr_in=${trn_in} ${drc_spt}/hyperspectral_dummy.nc ${trn_out}"
 	hst_att="`date`: ${cmd_ln}"
 	att_in="${trn_out}"
 	if [ ${dbg_lvl} -ge 1 ]; then
@@ -553,11 +567,15 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	printf "jsn(in)  : ${jsn_in}\n"
 	printf "jsn(out) : ${jsn_fl}\n"
 
-	dbg_cmd="dbg=json"
-	if [ ${dbg_lvl} = 3 ]; then
-		dbg_cmd=${dbg_cmd}",latlng,graph"
-	fi # !dbg setting for metadata
-	cmd_jsn[${fl_idx}]="python ${drc_spt}/hyperspectral_metadata.py ${dbg_cmd} ${jsn_in} ${jsn_out}"
+	dbg_cmd="dbg=yes" # Display debug information
+	fmt_cmd="fmt=4" # netCDF format (netCDF[3]/netCDF[4])
+	ftn_cmd="ftn=no" # Flatten output file
+
+	if [ ${dbg_lvl} -eq 0 ]; then
+	    dbg_cmd="dbg=no" # Quiet
+	fi # !dbg
+
+	cmd_jsn[${fl_idx}]="python ${drc_spt}/hyperspectral_metadata.py ${dbg_cmd} ${fmt_cmd} ${ftn_cmd} ${jsn_in} ${jsn_out}"
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_jsn[${fl_idx}]}
 	fi # !dbg
@@ -587,6 +605,24 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 		exit 1
 	    fi # !err
 	fi # !dbg
+	if [ "${flg_vnir}" = 'Yes' ]; then
+	    # 20161114: Second merge adds exposure-appropriate calibration data to VNIR image files
+	    mrg_in=${fl_clb}
+	    mrg_out=${att_out}
+	    printf "mrg(in)  : ${mrg_in}\n"
+	    printf "mrg(out) : ${mrg_out}\n"
+	    cmd_mrg[${fl_idx}]="ncks -A -C -v xps_img_wht,xps_img_drk ${mrg_in} ${mrg_out}"
+	    if [ ${dbg_lvl} -ge 1 ]; then
+		echo ${cmd_mrg[${fl_idx}]}
+	    fi # !dbg
+	    if [ ${dbg_lvl} -ne 2 ]; then
+		eval ${cmd_mrg[${fl_idx}]}
+		if [ $? -ne 0 ] || [ ! -f ${mrg_out} ]; then
+		    printf "${spt_nm}: ERROR Failed to merge white/dark calibration with data file. Debug this:\n${cmd_mrg[${fl_idx}]}\n"
+		    exit 1
+		fi # !err
+	    fi # !dbg
+	fi # !flg_vnir
     fi # !mrg_flg
     
     # Calibrate
@@ -599,10 +635,15 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	# Hyperspectral Metadata has always been placed in groups
 	# As of ~201605 Environmental Sensor uses groups
 	# Calibration (theoretically) uses ES data (for absolute fluxes), so must be done on group files
-	# Following command would not propagate any group data/metadata from input to output file
+	# Following command works only with netCDF3, does not propagate group data/metadata from input to output file
 	# cmd_clb[${fl_idx}]="ncap2 -O -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_out}"
 	# Hence perform calibration as root-level append operation, then, if successful, move file to output file
-	cmd_clb[${fl_idx}]="ncap2 -A -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_in}"
+	#cmd_clb[${fl_idx}]="ncap2 -A -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_in}"
+	#drc_spt_var="\*drc_spt='\"${drc_spt}\"s'" # OK, passes string into variable
+	 drc_spt_att="@drc_spt='\"${drc_spt}\"'" 
+	 # NCO_PATH environment variable required for hyperspectral_calibration.nco to find hyperspectral_spectralon_reflectance_factory.nco
+	 export NCO_PATH="${drc_spt}"
+	 cmd_clb[${fl_idx}]="ncap2 -A ${nco_opt} -s ${drc_spt_att} -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_in}"
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_clb[${fl_idx}]}
 	fi # !dbg
@@ -632,7 +673,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	cmp_out="${cmp_fl}.fl${idx_prn}.tmp"
 	printf "cmp(in)  : ${cmp_in}\n"
 	printf "cmp(out) : ${cmp_out}\n"
-	cmd_cmp[${fl_idx}]="ncks -L ${dfl_lvl} ${cmp_in} ${cmp_out}"
+	cmd_cmp[${fl_idx}]="ncks -O --no_tmp_fl ${nco_opt} -L ${dfl_lvl} ${cmp_in} ${cmp_out}"
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_cmp[${fl_idx}]}
 	fi # !dbg
@@ -742,7 +783,21 @@ fi # !0
 if [ "${cln_flg}" = 'Yes' ]; then
     printf "Cleaning-up intermediate files...\n"
     /bin/rm -f ${anl_fl}.fl*.tmp ${att_fl}.fl*.tmp ${clb_fl}.fl*.tmp ${cmp_fl}.fl*.tmp ${jsn_fl}.fl*.tmp ${mrg_fl}.fl*.tmp ${trn_fl}.fl*.tmp
+else # !cln_flg
+    printf "Explicitly instructed not to clean-up intermediate files.\n"
 fi # !cln_flg
+
+verbosity=2
+if [ ${dbg_lvl} -eq 0 ]; then
+    verbosity=0
+fi # !dbg_lvl
+cmd_qaqc="python ${drc_spt}/hyperspectral_test.py ${out_fl} ${verbosity}"
+eval ${cmd_qaqc}
+if [ $? -ne 0 ]; then
+    printf "QA/QC check found with 1 or more unexpected FAILURES\n"
+else
+    printf "QA/QC check successful for all tests\n"
+fi
 
 date_end=$(date +"%s")
 if [ ${fl_nbr} -eq 0 ]; then
