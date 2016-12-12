@@ -2,7 +2,8 @@
 
 '''
 Created on Feb 5, 2016
-This module parses JSON formatted metadata and data and header provided by LemnaTec and outputs a formatted netCDF4 file
+
+Purpose: Parse JSON-formatted metadata and data and header provided by LemnaTec to produce netCDF4 output
 
 @author: jeromemao
 ----------------------------------------------------------------------------------------
@@ -10,12 +11,16 @@ This script works with both Python 2.7+ and 3+, depending on the netCDF4 module 
 Thanks for the advice from Professor Zender and sample data from Dr. LeBauer.
 ----------------------------------------------------------------------------------------
 Usage (commandline):
-python hyperspectral_metadata.py filePath1 filePath2
+python hyperspectral_metadata.py dbg=yes fmt=4 ftn=no filePath1 filePath2
 
 where
 hyperspectral_metadata.py is where this script located
 filePath1 is source data file
 filePath2 is user's desired output file
+fmt (format) is the format of the output file; it can be netCDF4 or netCDF3 ("3" or "4")
+ftn (flatten) is whether flatten the output file; if yes, all the variables and attributes will be in root groups ("yes" or "no")
+
+Please note that since netCDF3 does NOT support individual groups, the execution with fmt=3 will be flatten no matter the option for ftn
 
 Warning:
 Make sure the json metadata ended with <data_name>+_metadata.json and the hdr file ended with <data_name>+_raw.hdr
@@ -25,15 +30,15 @@ Data: data_raw
 Metadata: data_metadata.json
 Header: data_raw.hdr
 
-The correct command is
-python ${HOME}/terraref/computing-pipeline/scripts/hyperspectral/hyperspectral_metadata.py ${DATA}/terraref/data_raw ${DATA}/terraref/output
-
-hyperspectral_metadata.py will authomatically find data_raw, data_metadata.json and data_raw.hdr
+Usage:
+python hyperspectral_metadata.py dbg=yes fmt=4 ftn=no in.json out.nc
 
 Example:
-python ${HOME}/terraref/computing-pipeline/scripts/hyperspectral/hyperspectral_metadata.py -C SWIR -dbg=json ${DATA}/terraref/test_metadata.json ${DATA}/terraref/data
+python ${HOME}/terraref/computing-pipeline/scripts/hyperspectral/hyperspectral_metadata.py dbg=yes fmt=4 ftn=no ${DATA}/terraref/VNIR/2016-10-06/2016-10-06__15-21-20-178/b73a4f00-4140-4576-8c70-8e1d26ae245e_raw ~/foo.nc
+
+If pointed to a directory rather than a file, hyperspectral_metadata.py will authomatically find data_raw, data_metadata.json and data_raw.hdr
 ----------------------------------------------------------------------------------------
-UPDATE LOG (reverse chronological order)
+UPDATE LOG (reverse chronological order):
 
 Update 20160901:
 Rename from JsonDealer.py to hyperspectral_metadata.py
@@ -77,29 +82,29 @@ import os
 import re
 import struct
 from datetime import date, datetime
-from netCDF4 import Dataset
+from netCDF4 import Dataset, stringtochar
 from hyperspectral_calculation import pixel2Geographic, REFERENCE_POINT
 
-_UNIT_DICTIONARY = {'m': 'meter',
-                    's': 'second', 'm/s': 'meter second-1', '': ''}
+_UNIT_DICTIONARY = {
+                    'm':   'meter',
+                    's':   'second', 
+                    'm/s': 'meter second-1', 
+                    '':    ''
+                   }
 
-_VELOCITY_DICTIONARY = {'x': 'u', 'y': 'v', 'z': 'w'}
+_VELOCITY_DICTIONARY = {
+                        'x': 'u', 
+                        'y': 'v', 
+                        'z': 'w'
+                       }
 
 DATATYPE = {'1': ('H', 2), '2': ('i', 4), '3': ('l', 4), '4': ('f', 4), '5': (
     'd', 8), '12': ('H', 4), '13': ('L', 4), '14': ('q', 8), '15': ('Q', 8)}
-
-_UNIX_BASETIME    = date(year=1970, month=1, day=1)
 
 _IS_DIGIT         = lambda fakeNum: set([member.isdigit() for member in fakeNum.split(".")]) == {True}
 _TIMESTAMP        = lambda: time.strftime("%a %b %d %H:%M:%S %Y",  time.localtime(int(time.time())))
 
 _WARN_MSG         = "{msg}"
-
-_DEBUGOPT         = {"json"  : False, 
-                     "graph" : False,
-                     "latlon": False}
-
-_CAMERAOPT        = "SWIR"
 
 
 class DataContainer(object):
@@ -122,18 +127,19 @@ class DataContainer(object):
         if param in self.__dict__:
             return self.__dict__[param]
 
-    def writeToNetCDF(self, inputFilePath, outputFilePath, commandLine):
+    def writeToNetCDF(self, inputFilePath, outputFilePath, commandLine, format, flatten=False, _debug=True):
         # weird, but useful to check whether the HeaderInfo id in the netCDF
         # file
         setattr(self, "header_info", None)
-        netCDFHandler = _file_existence_check(outputFilePath, self)
+        netCDFHandler = _file_existence_check(outputFilePath, format, self)
         delattr(self, "header_info")
 
         #### Replace the original isdigit function
+        camera_opt = "SWIR"
 
         ##### Write the data from metadata to netCDF #####
         for key, data in self.__dict__.items():
-            tempGroup = netCDFHandler.createGroup(key)
+            tempGroup = netCDFHandler.createGroup(key) if not flatten else netCDFHandler
             for subkey, subdata in data.items():
                 if not _IS_DIGIT(subdata): #Case for letter variables
                     if 'date' in subkey and subkey != "date of installation" and subkey != "date of handover":
@@ -166,14 +172,14 @@ class DataContainer(object):
         # Check if the wavelength is correctly collected
         assert len(wavelength) in (955, 272), "ERROR: Failed to get wavlength informations. Please check if you modified the *.hdr files"
 
-        _CAMERAOPT = 'VNIR' if len(wavelength) == 955 else 'SWIR' # Choose appropriate camera by counting the number of wavelengths.
+        camera_opt = 'VNIR' if len(wavelength) == 955 else 'SWIR' # Choose appropriate camera by counting the number of wavelengths.
 
         tempWavelength = netCDFHandler.createVariable(
             "wavelength", 'f8', 'wavelength')
         setattr(tempWavelength, 'long_name', 'Hyperspectral Wavelength')
         setattr(tempWavelength, 'units', 'nanometers')
-        tempWavelength[:] = wavelength
-        write_header_file(inputFilePath, netCDFHandler)
+        tempWavelength[...] = wavelength
+        write_header_file(inputFilePath, netCDFHandler, flatten, _debug)
 
         ##### Write the data from frameIndex files to netCDF #####
         tempFrameTime = frame_index_parser(''.join((inputFilePath.strip("raw"), "frameIndex.txt")), yearMonthDate)
@@ -183,7 +189,7 @@ class DataContainer(object):
         assert len(tempFrameTime), "ERROR: Failed to collect frame time information from " + ''.join((inputFilePath.strip("raw"), "frameIndex.txt")) + ". Please check the file."
        
         frameTime    = netCDFHandler.createVariable("frametime", "f8", ("time",))
-        frameTime[:] = tempFrameTime
+        frameTime[...] = tempFrameTime
         setattr(frameTime, "units",    "days since 1970-01-01 00:00:00")
         setattr(frameTime, "calender", "gregorian")
         setattr(frameTime, "notes",    "Each time of the scanline of the y taken")
@@ -191,21 +197,21 @@ class DataContainer(object):
         ########################### Adding geographic positions ###########################
 
         xPixelsLocation, yPixelsLocation, boundingBox, googleMapAddress\
-         = pixel2Geographic("".join((inputFilePath[:-4],"_metadata.json")), "".join((inputFilePath,'.hdr')), _CAMERAOPT)
+         = pixel2Geographic("".join((inputFilePath[:-4],"_metadata.json")), "".join((inputFilePath,'.hdr')), camera_opt)
 
         # Check if the image width and height are correctly collected.
-        assert len(xPixelsLocation) > 0 and len(yPixelsLocation) > 0, "ERROR, Failed to collect the image size metadata from " + "".join((inputFilePath,'.hdr')) + ". Please check the file."
+        assert len(xPixelsLocation) > 0 and len(yPixelsLocation) > 0, "ERROR: Failed to collect the image size metadata from " + "".join((inputFilePath,'.hdr')) + ". Please check the file."
         
         netCDFHandler.createDimension("x", len(xPixelsLocation))
         x    = netCDFHandler.createVariable("x", "f8", ("x",))
-        x[:] = xPixelsLocation
+        x[...] = xPixelsLocation
         setattr(netCDFHandler.variables["x"], "units", "meters")
         setattr(netCDFHandler.variables['x'], 'reference_point', 'Southeast corner of field')
         setattr(netCDFHandler.variables['x'], "long_name", "North-south offset from southeast corner of field")
 
         netCDFHandler.createDimension("y", len(yPixelsLocation))
         y    = netCDFHandler.createVariable("y", "f8", ("y",))
-        y[:] = yPixelsLocation
+        y[...] = yPixelsLocation
         setattr(netCDFHandler.variables["y"], "units", "meters")
         setattr(netCDFHandler.variables['y'], 'reference_point', 'Southeast corner of field')
         setattr(netCDFHandler.variables['y'], "long_name", "Distance west of the southeast corner of the field")
@@ -285,57 +291,81 @@ class DataContainer(object):
         setattr(netCDFHandler.variables["lon_img_nw"], "long_name", "Longitude of northwest corner of image")
 
         xSe = netCDFHandler.createVariable("x_img_se", "f8")
-        xSe[...] = float(x[-1] + REFERENCE_POINT[0])
+        xSe[...] = float(x[-1])
         setattr(netCDFHandler.variables["x_img_se"], "units", "meters")
         setattr(netCDFHandler.variables["x_img_se"], "long_name", "Southeast corner of image, north distance to reference point")
 
         # have a "x_y_img_se" in meters, double
         ySe = netCDFHandler.createVariable("y_img_se", "f8")
-        ySe[...] = float(y[-1] + REFERENCE_POINT[1])
+        ySe[...] = float(y[-1])
         setattr(netCDFHandler.variables["y_img_se"], "units", "meters")
         setattr(netCDFHandler.variables["y_img_se"], "long_name", "Southeast corner of image, west distance to reference point")
 
         xSw = netCDFHandler.createVariable("x_img_sw", "f8")
-        xSw[...] = float(x[0] + REFERENCE_POINT[0])
+        xSw[...] = float(x[0])
         setattr(netCDFHandler.variables["x_img_sw"], "units", "meters")
         setattr(netCDFHandler.variables["x_img_sw"], "long_name", "Southwest corner of image, north distance to reference point")
 
         ySw = netCDFHandler.createVariable("y_img_sw", "f8")
-        ySw[...] = float(y[-1] + REFERENCE_POINT[1])
+        ySw[...] = float(y[-1])
         setattr(netCDFHandler.variables["y_img_sw"], "units", "meters")
         setattr(netCDFHandler.variables["y_img_sw"], "long_name", "Southwest corner of image, west distance to reference point")
 
         xNe = netCDFHandler.createVariable("x_img_ne", "f8")
-        xNe[...] = float(x[-1] + REFERENCE_POINT[0])
+        xNe[...] = float(x[-1])
         setattr(netCDFHandler.variables["x_img_ne"], "units", "meters")
         setattr(netCDFHandler.variables["x_img_ne"], "long_name", "Northeast corner of image, north distance to reference point")
 
         yNe = netCDFHandler.createVariable("y_img_ne", "f8")
-        yNe[...] = float(y[0] + REFERENCE_POINT[1])
+        yNe[...] = float(y[0])
         setattr(netCDFHandler.variables["y_img_ne"], "units", "meters")
         setattr(netCDFHandler.variables["y_img_ne"], "long_name", "Northeast corner of image, west distance to reference point")
 
         xNw = netCDFHandler.createVariable("x_img_nw", "f8")
-        xNw[...] = float(x[0] + REFERENCE_POINT[0])
+        xNw[...] = float(x[0])
         setattr(netCDFHandler.variables["x_img_nw"], "units", "meters")
         setattr(netCDFHandler.variables["x_img_nw"], "long_name", "Northwest corner of image, north distance to reference point")
 
         yNw = netCDFHandler.createVariable("y_img_nw", "f8")
-        yNw[...] = float(y[0] + REFERENCE_POINT[1])
+        yNw[...] = float(y[0])
         setattr(netCDFHandler.variables["y_img_nw"], "units", "meters")
         setattr(netCDFHandler.variables["y_img_nw"], "long_name", "Northwest corner of image, west distance to reference point")
+        
+        if format == "NETCDF3_CLASSIC":
+            netCDFHandler.createDimension("length of Google Map String", len(googleMapAddress))
+            googleMapView = netCDFHandler.createVariable("Google_Map_View", "S1", ("length of Google Map String",))
+            tempAddress = np.chararray((1, 1), itemsize=len(googleMapAddress))
+            tempAddress[:] = googleMapAddress
+            googleMapView[...] = stringtochar(tempAddress)[0]
+        else:
+            googleMapView = netCDFHandler.createVariable("Google_Map_View", str)
+            googleMapView[...] = googleMapAddress
 
-        googleMapView = netCDFHandler.createVariable("Google_Map_View", str)
-        googleMapView[...] = googleMapAddress
         setattr(netCDFHandler.variables["Google_Map_View"], "usage", "copy and paste to your web browser")
         setattr(netCDFHandler.variables["Google_Map_View"], 'reference_point', 'Southeast corner of field')
+
+        y_pxl_sz = netCDFHandler.createVariable("y_pxl_sz", "f8")
+        y_pxl_sz[...] = 0.98526434004512529576754637665e-3
+        setattr(netCDFHandler.variables["y_pxl_sz"], "units", "meters")
+        setattr(netCDFHandler.variables["y_pxl_sz"], "notes", "y coordinate length of a single pixel in pictures captured by SWIR and VNIR camera")
+
+        if camera_opt == "SWIR":
+            x_pxl_sz = netCDFHandler.createVariable("x_pxl_sz", "f8")
+            x_pxl_sz[...] = 1.025e-3
+            setattr(netCDFHandler.variables["x_pxl_sz"], "units", "meters")
+            setattr(netCDFHandler.variables["x_pxl_sz"], "notes", "x coordinate length of a single pixel in SWIR images")
+        else:
+            x_pxl_sz = netCDFHandler.createVariable("x_pxl_sz", "f8")
+            x_pxl_sz[...] = 1.930615052e-3
+            setattr(netCDFHandler.variables["x_pxl_sz"], "units", "meters")
+            setattr(netCDFHandler.variables["x_pxl_sz"], "notes", "x coordinate length of a single pixel in VNIR images")
 
         ##### Write the history to netCDF #####
         netCDFHandler.history = ''.join((_TIMESTAMP(), ': python ', commandLine))
 
         netCDFHandler.close()
 
-def getDimension(fileName):
+def getDimension(fileName, _debug=True):
     '''
     Acquire dimensions from related HDR file; these dimensions are:
     samples -> 'x'
@@ -354,7 +384,7 @@ def getDimension(fileName):
         try:
             return int(wavelength), int(x), int(y)
         except:
-            if _DEBUGOPT["json"]:
+            if _debug:
                 print >> sys.stderr, _WARN_MSG.format(msg='ERROR: sample, lines and bands variables in header file are broken. Header information will not be written into the netCDF')
             return 0, 0, 0
 
@@ -376,7 +406,7 @@ def get_header_info(fileName):
         return infoDictionary
 
 
-def _file_existence_check(filePath, dataContainer):
+def _file_existence_check(filePath, fmt, dataContainer):
     '''
     This method will check wheter the filePath has the same variable name as the dataContainer has. If so,
     user will decide whether skip or overwrite it (no append,
@@ -388,7 +418,7 @@ def _file_existence_check(filePath, dataContainer):
         filePath += "".join(("/", filePath.split("/")[-1], ".nc"))
 
     if os.path.exists(filePath):
-        netCDFHandler = Dataset(filePath, 'r', format='NETCDF4')
+        netCDFHandler = Dataset(filePath, 'r', format=fmt)
         if set([x.encode('utf-8') for x in netCDFHandler.groups]) - \
            set([x for x in dataContainer.__dict__]) != set([x.encode('utf-8') for x in netCDFHandler.groups]):
 
@@ -400,11 +430,10 @@ def _file_existence_check(filePath, dataContainer):
                     exit()
                 elif userChoice in ('O', 'A'):
                     os.remove(filePath)
-                    return Dataset(filePath, 'w', format='NETCDF4')
+                    return Dataset(filePath, 'w', format=fmt)
         else:
             os.remove(filePath)
-
-    return Dataset(filePath, 'w', format='NETCDF4')
+    return Dataset(filePath, 'w', format=fmt)
 
 def _reformat_string(string):
     '''
@@ -472,17 +501,18 @@ def _filter_the_headings(target):
     return target
 
 
-def jsonHandler(jsonFile):
+def jsonHandler(jsonFile, _debug=True):
     '''
     pass the json object to built-in json module
     '''
     with open("".join((jsonFile[:-4],'_metadata.json'))) as fileHandler:
-        if _DEBUGOPT["json"]:
+        if _debug:
             jsonCheck(fileHandler)
         return json.loads(fileHandler.read(), object_hook=_filter_the_headings)
 
 def translate_time(yearMonthDate, frameTimeString=None):
     hourUnpack, timeUnpack = None, None
+    _unix_basetime    = date(year=1970, month=1, day=1)
     time_pattern      = re.compile(r'(\d{4})-(\d{2})-(\d{2})'),\
                         re.compile(r'(\d{2})/(\d{2})/(\d{4})\s(\d{2}):(\d{2}):(\d{2})'),\
                         re.compile(r'(\d{2}):(\d{2}):(\d{2})')
@@ -496,7 +526,7 @@ def translate_time(yearMonthDate, frameTimeString=None):
         timeUnpack = datetime.strptime(yearMonthDate, "%Y-%m-%d").timetuple()
 
     timeSplit  = date(year=timeUnpack.tm_year, month=timeUnpack.tm_mon,
-                      day=timeUnpack.tm_mday) - _UNIX_BASETIME #time period to the UNIX basetime
+                      day=timeUnpack.tm_mday) - _unix_basetime #time period to the UNIX basetime
     if frameTimeString:
         return (timeSplit.total_seconds() + hourUnpack.tm_hour * 3600.0 + hourUnpack.tm_min * 60.0 +
                 hourUnpack.tm_sec) / (3600.0 * 24.0)
@@ -538,11 +568,11 @@ def jsonCheck(fileHandler):
     fileHandler.seek(0) #Reset the file read ptr
 
 
-def write_header_file(fileName, netCDFHandler):
+def write_header_file(fileName, netCDFHandler, flatten=False, _debug=True):
     '''
     The main function, reading the data and exporting netCDF file
     '''
-    if not getDimension(fileName):
+    if not getDimension(fileName, _debug):
         print >> sys.stderr, "ERROR: Cannot get dimension infos from", "".join((fileName, '.hdr'))
         return
     dimensionWavelength, dimensionX, dimensionY = getDimension(fileName)
@@ -568,7 +598,7 @@ def write_header_file(fileName, netCDFHandler):
     # tempVariable[:,:,:] = value
 
     #setattr(netCDFHandler, 'wavelength', wavelength)
-    headerInfo = netCDFHandler.createGroup("header_info")
+    headerInfo = netCDFHandler.createGroup("header_info") if not flatten else netCDFHandler
     threeColorBands = list()
 
     for members in hdrInfo:
@@ -598,28 +628,52 @@ def write_header_file(fileName, netCDFHandler):
         # blue_band_index long_name = 'Index of blue band used for RGB composite'
         
     except:
-        if _DEBUGOPT["json"]:
-            print >> sys.stderr, _WARN_MSG.format(msg='WARNING: default_band variable in the header file is missing.')
+        pass
+
+def _argument_parser(*args):
+    assert len(args) >= 3, "Please make sure you have enough arguments! (sourcefile, [debug_option,], [format_option], [flatten_option], fileInput, fileoutput)"
+
+    source   = args[0]
+    input_f  = args[-2]
+    output_f = args[-1]
+    format   = 4
+    flatten  = "yes"
+    debug    = "yes"
+
+    format_regex  = r"fmt=(3|4)"
+    debug_regex   = r"dbg=(yes|no)"
+    flatten_regex = r"ftn=(yes|no)"
+
+    for members in args:
+        if re.match(format_regex, members):
+            format  = int(re.match(format_regex, members).groups(1)[0])
+        elif re.match(flatten_regex, members):
+            flatten = re.match(flatten_regex, members).groups(1)[0]
+        elif re.match(debug_regex, members):
+            debug = re.match(debug_regex, members).groups(1)[0]
+          
+    flatten = True if flatten == "yes" else False
+    flatten = True if format == 3 else flatten
+    debug   = True if debug == "yes" else False
+    format  = "NETCDF4" if format == 4 else "NETCDF3_CLASSIC"
+
+    return source, input_f, output_f, format, flatten, debug
+
 
 def main():
-    assert len(sys.argv) >= 3, "Please make sure you have enough arguments! (sourcefile, camera_option, [debug_option,] fileInput, fileoutput)"
+    source_file, file_input, file_output, format, flatten, debug = _argument_parser(*sys.argv[1:])
 
-    if len(sys.argv) >= 4:
-        debug_option = sys.argv[-3].split("=")[-1].split(",")
-        for members in debug_option:
-            _DEBUGOPT[members] = True
+    missing_files = file_dependency_check(file_input)
 
-    fileInput, fileOutput = sys.argv[-2], sys.argv[-1]
-    missingFiles = file_dependency_check(fileInput)
-    if len(missingFiles) > 0:
+    if len(missing_files) > 0:
         print >> sys.stderr, _WARN_MSG.format(msg="One or more important file(s) is(are) missing. Program terminated")
 
-        for missingFile in missingFiles:
-            print >> sys.stderr, "".join((missingFile," is missing"))
+        for missing_file in missing_files:
+            print >> sys.stderr, "".join((missing_file," is missing"))
         exit()
 
-    testCase = jsonHandler(fileInput)
-    testCase.writeToNetCDF(fileInput, fileOutput, " ".join((fileInput, fileOutput)))
+    testCase = jsonHandler(file_input, debug)
+    testCase.writeToNetCDF(file_input, file_output, " ".join((file_input, file_output)), format, flatten, debug)
 
 
 if __name__ == '__main__':
