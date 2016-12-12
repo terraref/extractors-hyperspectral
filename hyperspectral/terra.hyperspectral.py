@@ -15,151 +15,127 @@ import os
 import subprocess
 import json
 import logging
-from config import *
-import pyclowder.extractors as extractors
 
+from pyclowder.extractors import Extractor
+from pyclowder.utils import CheckMessage
+import pyclowder.files
+import pyclowder.datasets
 
-def main():
-	global extractorName, messageType, rabbitmqExchange, rabbitmqURL, registrationEndpoints, mountedPaths
+class HyperspectralRaw2NetCDF(Extractor):
+	def __init__(self):
+		Extractor.__init__(self)
 
-	#set logging
-	logging.basicConfig(format='%(levelname)-7s : %(name)s -  %(message)s', level=logging.WARN)
-	logging.getLogger('pyclowder.extractors').setLevel(logging.INFO)
-	logger = logging.getLogger('extractor')
-	logger.setLevel(logging.DEBUG)
+		# add any additional arguments to parser
+		# self.parser.add_argument('--max', '-m', type=int, nargs='?', default=-1,
+		#                          help='maximum number (default=-1)')
+		self.parser.add_argument('--output', '-o', dest="output_dir", type=str, nargs='?',
+								 default="/home/ubuntu/sites/ua-mac/Level_1/hyperspectral",
+								 help="root directory where timestamp & output directories will be created")
 
-	# setup
-	extractors.setup(extractorName=extractorName,
-					 messageType=messageType,
-					 rabbitmqURL=rabbitmqURL,
-					 rabbitmqExchange=rabbitmqExchange,
-					 mountedPaths=mountedPaths)
+		# parse command line and load default logging configuration
+		self.setup()
 
-	# register extractor info
-	extractors.register_extractor(registrationEndpoints)
+		# setup logging for the exctractor
+		logging.getLogger('pyclowder').setLevel(logging.DEBUG)
+		logging.getLogger('__main__').setLevel(logging.DEBUG)
 
-	#connect to rabbitmq
-	extractors.connect_message_bus(extractorName=extractorName,
-								   messageType=messageType,
-								   processFileFunction=process_dataset,
-								   checkMessageFunction=check_message,
-								   rabbitmqExchange=rabbitmqExchange,
-								   rabbitmqURL=rabbitmqURL)
+		# assign other arguments
+		self.output_dir = self.args.output_dir
 
-def check_message(parameters):
-	# Check for expected input files before beginning processing
-	if has_all_files(parameters):
-		if has_output_file(parameters):
-			print 'skipping, output file already exists'
-			return False
+	def check_message(self, connector, host, secret_key, resource, parameters):
+		if has_all_files(parameters):
+			if has_output_file(parameters):
+				logging.info('skipping dataset %s, output file already exists' % resource['id'])
+				return CheckMessage.ignore
+			else:
+				# Check if we have necessary metadata, either as a .json file or attached to dataset
+				found_md = False
+				for f in resource['files']:
+					if f['filename'] == 'metadata.json':
+						found_md = True
+				if not found_md:
+					md = pyclowder.datasets.download_metadata(connector, host, secret_key,
+															  resource['id'], self.extractor_info['name'])
+					if len(md) > 0:
+						for m in md:
+							# Check if this extractor has already been processed
+							if 'agent' in m and 'name' in m['agent']:
+								if m['agent']['name'].find(self.extractor_info['name']) > -1:
+									print("skipping dataset %s, already processed" % resource['id'])
+									return CheckMessage.ignore
+							if 'content' in m and 'lemnatec_measurement_metadata' in m['content']:
+								found_md = True
+				if found_md:
+					return CheckMessage.download
 		else:
-			# Check if we have necessary metadata, either as a .json file or attached to dataset
-			found_md = False
-			for f in parameters['filelist']:
-				if f['filename'] == 'metadata.json':
-					found_md = True
-			if not found_md:
-				md = extractors.download_dataset_metadata_jsonld(parameters['host'], parameters['secretKey'], parameters['datasetId'], extractorName)
-				if len(md) > 0:
-					for m in md:
-						# Check if this extractor has already been processed
-						if 'agent' in m and 'name' in m['agent']:
-							if m['agent']['name'].find(extractorName) > -1:
-								print("skipping dataset %s, already processed" % parameters['datasetId'])
-								return False
-						if 'content' in m and 'lemnatec_measurement_metadata' in m['content']:
-							found_md = True
-			if found_md:
-				return True
-	else:
-		print 'skipping, not all input files are ready'
-		return False
+			logging.info('skipping dataset %s, not all input files are ready' % resource['id'])
+			return CheckMessage.ignore
 
-# ----------------------------------------------------------------------
-# Process the dataset message and upload the results
-def process_dataset(parameters):
-	global extractorName, workerScript, inputDirectory, outputDirectory, requiredInputFiles
+	def process_message(self, connector, host, secret_key, resource, parameters):
+		# Find input files in dataset
+		target_files = {
+			'raw': None,
+			'raw.hdr': None,
+			'image.jpg': None,
+			'frameIndex.txt': None,
+			'settings.txt': None,
+			"_metadata.json": None
+		}
 
-	# Find input files in dataset
-	files = dict()
-	metafile = None
-	ds_metafile = None
-	distinctPaths = []
-	for f in parameters['files']:
-		for fileExt in requiredInputFiles:
-			if f.endswith(fileExt):
-				files[fileExt] = {
-					'filename': os.path.basename(f),
-					'path': f
-				}
-				distinctPaths.append(f.replace(os.path.basename(f),''))
-		if f.endswith('_metadata.json') and not f.endswith('/_metadata.json'):
-			metafile = f
-		if f.endswith('/_dataset_metadata.json'):
-			ds_metafile = f
+		metafile = None
+		ds_metafile = None
+		for f in resource['local_paths']:
+			for fileExt in target_files.keys:
+				if f.endswith(fileExt) and fileExt != '_metadata.json':
+					target_files[fileExt] = {
+						'filename': os.path.basename(f),
+						'path': f
+					}
+			if f.endswith('_metadata.json') and not f.endswith('/_metadata.json'):
+				metafile = f
+			if f.endswith('/_dataset_metadata.json'):
+				ds_metafile = f
 
-	# Identify md file either with other dataset files, or attached to Clowder dataset
-	if metafile == None:
-		if ds_metafile != None:
-			files['_metadata.json'] = {'filename': os.path.basename(ds_metafile), 'path': ds_metafile}
-			distinctPaths.append(metafile.replace(os.path.basename(metafile),''))
+		# Identify md file either with other dataset files, or attached to Clowder dataset
+		if metafile == None:
+			if ds_metafile != None:
+				# Found dataset metadata, so check for the .json file alongside other files
+				logging.info("...checking for local metadata file alongside other files")
+				ds_dir = os.path.basename(target_files['_raw']['path'])
+				ds_files = os.path.listdir(ds_dir)
+				for ds_f in ds_files:
+					if ds_f.endswith("_metadata.json"):
+						target_files['_metadata.json']['path'] = os.path.join(ds_dir, ds_f)
+			else:
+				logging.error('could not locate metadata')
+				return
 		else:
-			print('could not locate metadata')
-			return
-	else:
-		files['_metadata.json'] = {'filename': os.path.basename(metafile), 'path': metafile}
-		distinctPaths.append(metafile.replace(os.path.basename(metafile),''))
+			target_files['_metadata.json'] = {'filename': os.path.basename(metafile),
+											  'path': metafile}
 
-	# Check if files are in same folder (i.e. is a local path) or not (i.e. is temp) - move together if not
-	if len(distinctPaths) > 1:
-		print("More than one directory found for files. Moving files to same directory for processing.")
-		for fileExt in files:
-			# Restore temp filenames to original - script requires specific name formatting so tmp names aren't suitable
-			files[fileExt]['old_path'] = files[fileExt]['path']
-			files[fileExt]['path'] = os.path.join(inputDirectory, files[fileExt]['filename'])
-			os.rename(files[fileExt]['old_path'], files[fileExt]['path'])
-			if fileExt == '_metadata.json' and files[fileExt]['filename'].endswith('_dataset_metadata.json'):
-				# Convert _dataset_metadata autogenerated file into original metadata.json format
-				rootName = files['_raw']['filename'].replace('_raw', '')
-				newMetaName = files[fileExt]['path'].replace('_dataset_metadata.json', rootName+'_metadata.json')
-				os.rename(files[fileExt]['path'], newMetaName)
-				files[fileExt]['path'] = newMetaName
-				with open(newMetaName, 'r') as md_file:
-					md_contents = json.load(md_file)
-				for md in md_contents:
-					if 'content' in md and 'lemnatec_measurement_metadata' in md['content']:
-						with open(newMetaName, 'w') as md_file:
-							md_file.write(json.dumps(md['content']))
-			print 'found %s file: %s' % (fileExt, files[fileExt]['path'])
+		# Invoke terraref.sh
+		outFilePath = os.path.join(self.output_dir,
+								   resource['dataset_info']['name'].split(' - ')[1].split('__')[0],
+								   resource['dataset_info']['name'].split(' - ')[1],
+								   get_output_filename(target_files['_raw']['filename']))
+		out_dir = outFilePath.replace(os.path.basename(outFilePath), '')
+		if not os.path.exists(out_dir):
+			os.makedirs(out_dir)
+		logging.debug('invoking terraref.sh to create: %s' % outFilePath)
+		#returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "2", "-I", inputDirectory, "-o", outFilePath])
+		returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-i", target_files['_raw']['path'], "-o", outFilePath])
 
-	else:
-		inputDirectory = distinctPaths[0]
+		# Verify outfile exists and upload to clowder
+		logging.debug('done creating output file (%s)' % (returncode))
+		if returncode != 0:
+			logging.error('script encountered an error')
+		if os.path.exists(outFilePath):
+			if returncode == 0:
+				logging.info('uploading %s' % outFilePath)
+				pyclowder.files.upload_to_dataset(connector, host, secret_key, resource['id'], outFilePath)
+		else:
+			logging.error('no output file was produced')
 
-	# Invoke terraref.sh
-	outFilePath = os.path.join(outputDirectory,
-							   parameters['datasetInfo']['name'].split(' - ')[1].split('__')[0],
-							   parameters['datasetInfo']['name'].split(' - ')[1],
-							   get_output_filename(files['_raw']['filename']))
-	print 'invoking terraref.sh to create: %s' % outFilePath
-	out_dir = outFilePath.replace(os.path.basename(outFilePath), '')
-	if not os.path.exists(out_dir):
-		os.makedirs(out_dir)
-	#returncode = subprocess.call(["bash", workerScript, "-d", "2", "-I", inputDirectory, "-o", outFilePath])
-	returncode = subprocess.call(["bash", workerScript, "-d", "1", "-i", files['_raw']['path'], "-o", outFilePath])
-	print 'done creating output file (%s)' % (returncode)
-
-	if returncode != 0:
-		print 'script encountered an error'
-
-	# Verify outfile exists and upload to clowder
-	if os.path.exists(outFilePath):
-		if returncode == 0:
-			print 'uploading output file...'
-			extractors.upload_file_to_dataset(filepath=outFilePath, parameters=parameters)
-	else:
-		print 'no output file was produced'
-
-# ----------------------------------------------------------------------
 # Find as many expected files as possible and return the set.
 def get_all_files(parameters):
 	global requiredInputFiles
@@ -179,12 +155,10 @@ def get_all_files(parameters):
 					}
 	return files
 
-# ----------------------------------------------------------------------
 # Returns the output filename.
 def get_output_filename(raw_filename):
 	return '%s.nc' % raw_filename[:-len('_raw')]
 
-# ----------------------------------------------------------------------
 # Returns true if all expected files are found.
 def has_all_files(parameters):
 	files = get_all_files(parameters)
@@ -195,7 +169,6 @@ def has_all_files(parameters):
 			allFilesFound = False
 	return allFilesFound
 
-# ----------------------------------------------------------------------
 # Returns true if the output file is present.
 def has_output_file(parameters):
 	if 'filelist' not in parameters:
@@ -212,4 +185,5 @@ def has_output_file(parameters):
 	return outFileFound
 
 if __name__ == "__main__":
-	main()
+	extractor = HyperspectralRaw2NetCDF()
+	extractor.start()
