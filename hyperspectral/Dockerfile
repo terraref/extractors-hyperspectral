@@ -106,4 +106,4 @@ RUN mkdir -p "${INPUTDIR}" && \
 
 COPY *.sh extractor_info.json *.py *.nc *.nco  ./
 ENTRYPOINT ["./entrypoint.sh"]
-CMD ["python", "./terra.hyperspectral.py"]
+CMD ["python", "./terra_hyperspectral.py"]
