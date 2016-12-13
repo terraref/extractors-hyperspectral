@@ -43,8 +43,8 @@ class HyperspectralRaw2NetCDF(Extractor):
 		self.output_dir = self.args.output_dir
 
 	def check_message(self, connector, host, secret_key, resource, parameters):
-		if has_all_files(parameters):
-			if has_output_file(parameters):
+		if has_all_files(resource):
+			if has_output_file(resource):
 				logging.info('skipping dataset %s, output file already exists' % resource['id'])
 				return CheckMessage.ignore
 			else:
@@ -137,51 +137,58 @@ class HyperspectralRaw2NetCDF(Extractor):
 			logging.error('no output file was produced')
 
 # Find as many expected files as possible and return the set.
-def get_all_files(parameters):
-	global requiredInputFiles
-	files = dict()
-	for fileExt in requiredInputFiles:
-		files[fileExt] = None
+def get_all_files(resource):
+	target_files = {
+		'raw': None,
+		'raw.hdr': None,
+		'image.jpg': None,
+		'frameIndex.txt': None,
+		'settings.txt': None
+	}
 
-	if 'filelist' in parameters:
-		for fileItem in parameters['filelist']:
+	if 'files' in resource:
+		for fileItem in resource['files']:
 			fileId   = fileItem['id']
 			fileName = fileItem['filename']
-			for fileExt in files:
+			for fileExt in target_files.keys():
 				if fileName.endswith(fileExt):
-					files[fileExt] = {
+					target_files[fileExt] = {
 						'id': fileId,
 						'filename': fileName
 					}
-	return files
+
+	return target_files
 
 # Returns the output filename.
 def get_output_filename(raw_filename):
 	return '%s.nc' % raw_filename[:-len('_raw')]
 
 # Returns true if all expected files are found.
-def has_all_files(parameters):
-	files = get_all_files(parameters)
+def has_all_files(resource):
+	target_files = get_all_files(resource)
 
 	allFilesFound = True
-	for fileExt in files:
-		if files[fileExt] == None:
+	for fileExt in target_files:
+		if target_files[fileExt] == None:
 			allFilesFound = False
+
 	return allFilesFound
 
 # Returns true if the output file is present.
-def has_output_file(parameters):
-	if 'filelist' not in parameters:
+def has_output_file(resource):
+	if 'files' not in resource:
 		return False
-	if not has_all_files(parameters):
+	if not has_all_files(resource):
 		return False
-	files = get_all_files(parameters)
+
+	files = get_all_files(resource)
 	outFilename = get_output_filename(files['_raw']['filename'])
 	outFileFound = False
-	for fileItem in parameters['filelist']:
+	for fileItem in resource['files']:
 		if outFilename == fileItem['filename']:
 			outFileFound = True
 			break
+
 	return outFileFound
 
 if __name__ == "__main__":
