@@ -31,6 +31,9 @@ class HyperspectralRaw2NetCDF(Extractor):
 		self.parser.add_argument('--output', '-o', dest="output_dir", type=str, nargs='?',
 								 default="/home/ubuntu/sites/ua-mac/Level_1/hyperspectral",
 								 help="root directory where timestamp & output directories will be created")
+		self.parser.add_argument('--script', dest="main_script", type=str, nargs='?',
+								 default="hyperspectral_workflow.sh",
+								 help="location of hyperspectral_workflow.sh file")
 
 		# parse command line and load default logging configuration
 		self.setup()
@@ -41,6 +44,7 @@ class HyperspectralRaw2NetCDF(Extractor):
 
 		# assign other arguments
 		self.output_dir = self.args.output_dir
+		self.main_script = self.args.main_script
 
 	def check_message(self, connector, host, secret_key, resource, parameters):
 		if has_all_files(resource):
@@ -130,8 +134,8 @@ class HyperspectralRaw2NetCDF(Extractor):
 
 		# Invoke terraref.sh
 		logging.debug('invoking terraref.sh to create: %s' % outFilePath)
-		#returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "2", "-I", inputDirectory, "-o", outFilePath])
-		returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-i", target_files['raw']['path'], "-o", outFilePath])
+		#returncode = subprocess.call(["bash", self.main_script, "-d", "2", "-I", inputDirectory, "-o", outFilePath])
+		returncode = subprocess.call(["bash", self.main_script, "-d", "1", "-i", target_files['raw']['path'], "-o", outFilePath])
 
 		# Verify outfile exists and upload to clowder
 		logging.debug('done creating output file (%s)' % (returncode))
