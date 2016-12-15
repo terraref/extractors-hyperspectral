@@ -6,7 +6,7 @@ terra.hyperspectral.py
 This extractor will trigger when a file is added to a dataset in Clowder.
 It checks if all the required input files are present in the dataset while the
 output file is not present. The output filename is always determined from the
-filename of the `_raw` file.
+filename of the `raw` file.
 If the check is OK, it calls the `workerScript` defined in the config file to
 create a netCDF output file and adds that to the same dataset.
 """
@@ -101,7 +101,7 @@ class HyperspectralRaw2NetCDF(Extractor):
 			if ds_metafile != None:
 				# Found dataset metadata, so check for the .json file alongside other files
 				logging.info("...checking for local metadata file alongside other files")
-				ds_dir = os.path.basename(target_files['_raw']['path'])
+				ds_dir = os.path.basename(target_files['raw']['path'])
 				ds_files = os.path.listdir(ds_dir)
 				for ds_f in ds_files:
 					if ds_f.endswith("_metadata.json"):
@@ -117,13 +117,13 @@ class HyperspectralRaw2NetCDF(Extractor):
 		outFilePath = os.path.join(self.output_dir,
 								   resource['dataset_info']['name'].split(' - ')[1].split('__')[0],
 								   resource['dataset_info']['name'].split(' - ')[1],
-								   get_output_filename(target_files['_raw']['filename']))
+								   get_output_filename(target_files['raw']['filename']))
 		out_dir = outFilePath.replace(os.path.basename(outFilePath), '')
 		if not os.path.exists(out_dir):
 			os.makedirs(out_dir)
 		logging.debug('invoking terraref.sh to create: %s' % outFilePath)
 		#returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "2", "-I", inputDirectory, "-o", outFilePath])
-		returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-i", target_files['_raw']['path'], "-o", outFilePath])
+		returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-i", target_files['raw']['path'], "-o", outFilePath])
 
 		# Verify outfile exists and upload to clowder
 		logging.debug('done creating output file (%s)' % (returncode))
@@ -161,7 +161,7 @@ def get_all_files(resource):
 
 # Returns the output filename.
 def get_output_filename(raw_filename):
-	return '%s.nc' % raw_filename[:-len('_raw')]
+	return '%s.nc' % raw_filename[:-len('raw')]
 
 # Returns true if all expected files are found.
 def has_all_files(resource):
@@ -182,7 +182,7 @@ def has_output_file(resource):
 		return False
 
 	files = get_all_files(resource)
-	outFilename = get_output_filename(files['_raw']['filename'])
+	outFilename = get_output_filename(files['raw']['filename'])
 	outFileFound = False
 	for fileItem in resource['files']:
 		if outFilename == fileItem['filename']:
