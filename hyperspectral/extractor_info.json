@@ -1,12 +1,17 @@
 {
   "@context": "http://clowder.ncsa.illinois.edu/contexts/extractors.jsonld",
   "name": "terra.hyperspectral",
-  "version": "1.0",
+  "version": "2.0",
   "description": "Hyperspectral to netCDF",
-  "author": "Rob Kooper <kooper@illinois.edu>",
+  "author": "Charlie Zender",
   "contributors": [],
   "contexts": [],
-  "repository": {"repType": "git", "repUrl": "https://opensource.ncsa.illinois.edu/stash/scm/cats/pyclowder.git"},
+  "repository": {"repType": "git", "repUrl": "https://opensource.ncsa.illinois.edu/stash/scm/cats/pyclowder2.git"},
+  "process": {
+    "dataset": [
+      "file.added"
+    ]
+  },
   "external_services": [],
   "dependencies": [],
   "bibtex": []
