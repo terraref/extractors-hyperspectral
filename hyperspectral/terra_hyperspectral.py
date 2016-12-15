@@ -113,14 +113,22 @@ class HyperspectralRaw2NetCDF(Extractor):
 			target_files['_metadata.json'] = {'filename': os.path.basename(metafile),
 											  'path': metafile}
 
-		# Invoke terraref.sh
+		# Prep output location
+		try:
+			date_portion = resource['dataset_info']['name'].split(' - ')[1].split('__')[0]
+			timestamp_portion = resource['dataset_info']['name'].split(' - ')[1]
+		except:
+			date_portion = resource['dataset_info']['name']
+			timestamp_portion = ""
 		outFilePath = os.path.join(self.output_dir,
-								   resource['dataset_info']['name'].split(' - ')[1].split('__')[0],
-								   resource['dataset_info']['name'].split(' - ')[1],
+								   date_portion,
+								   timestamp_portion,
 								   get_output_filename(target_files['raw']['filename']))
 		out_dir = outFilePath.replace(os.path.basename(outFilePath), '')
 		if not os.path.exists(out_dir):
 			os.makedirs(out_dir)
+
+		# Invoke terraref.sh
 		logging.debug('invoking terraref.sh to create: %s' % outFilePath)
 		#returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "2", "-I", inputDirectory, "-o", outFilePath])
 		returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-i", target_files['raw']['path'], "-o", outFilePath])
