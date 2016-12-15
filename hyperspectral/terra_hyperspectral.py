@@ -85,7 +85,7 @@ class HyperspectralRaw2NetCDF(Extractor):
 		metafile = None
 		ds_metafile = None
 		for f in resource['local_paths']:
-			for fileExt in target_files.keys:
+			for fileExt in target_files.keys():
 				if f.endswith(fileExt) and fileExt != '_metadata.json':
 					target_files[fileExt] = {
 						'filename': os.path.basename(f),
