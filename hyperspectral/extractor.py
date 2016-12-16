@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-terra.hyperspectral.py
+terra_hyperspectral
 
 This extractor will trigger when a file is added to a dataset in Clowder.
 It checks if all the required input files are present in the dataset while the
@@ -20,6 +20,8 @@ from pyclowder.extractors import Extractor
 from pyclowder.utils import CheckMessage
 import pyclowder.files
 import pyclowder.datasets
+
+print ">>>>>>>>>>>>>", __name__
 
 class HyperspectralRaw2NetCDF(Extractor):
 	def __init__(self):
@@ -135,7 +137,8 @@ class HyperspectralRaw2NetCDF(Extractor):
 		# Invoke terraref.sh
 		logging.debug('invoking terraref.sh to create: %s' % outFilePath)
 		#returncode = subprocess.call(["bash", self.main_script, "-d", "2", "-I", inputDirectory, "-o", outFilePath])
-		returncode = subprocess.call(["bash", self.main_script, "-d", "1", "-i", target_files['raw']['path'], "-o", outFilePath])
+		returncode = subprocess.call([self.main_script, "-d", "1", "-i", 
+                target_files['raw']['path'], "-o", outFilePath])
 
 		# Verify outfile exists and upload to clowder
 		logging.debug('done creating output file (%s)' % (returncode))
@@ -203,6 +206,11 @@ def has_output_file(resource):
 
 	return outFileFound
 
-if __name__ == "__main__":
+
+def main():
 	extractor = HyperspectralRaw2NetCDF()
 	extractor.start()
+
+
+if __name__ == "__main__":
+    main()

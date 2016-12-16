@@ -18,7 +18,7 @@ setup(
 
     entry_points={
         'console_scripts': [
-            'terra_hyperspectral=hyperspectral.hyperspectral:main',
+            'terra_hyperspectral=hyperspectral.extractor:main',
         ],
     },
 
