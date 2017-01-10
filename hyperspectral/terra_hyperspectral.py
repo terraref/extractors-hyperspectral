@@ -134,9 +134,7 @@ class HyperspectralRaw2NetCDF(Extractor):
 			for f in target_files.keys():
 				currf = target_files[f]
 				if currf['filename'] == '_dataset_metadata.json':
-					newf = os.path.join(newdir, target_files['raw']['filename'].replace("_raw",""), '_metadata.json')
-					target_files[f]['oldfilename'] = '_dataset_metadata.json'
-					target_files[f]['filename'] = '_metadata.json'
+					newf = os.path.join(newdir, target_files['raw']['filename'].replace("_raw","")+'_metadata.json')
 				else:
 					newf = os.path.join(newdir, currf['filename'])
 				os.rename(currf['path'], newf)
@@ -180,9 +178,6 @@ class HyperspectralRaw2NetCDF(Extractor):
 			for f in target_files.keys():
 				if 'oldpath' in target_files[f]:
 					os.rename(target_files[f]['path'], target_files[f]['oldpath'])
-				if 'oldfilename' in target_files[f]:
-					os.rename(target_files[f]['oldpath'], target_files[f]['oldpath'].replace(
-							target_files[f]['filename'], target_files[f]['oldfilename']))
 
 # Find as many expected files as possible and return the set.
 def get_all_files(resource):
