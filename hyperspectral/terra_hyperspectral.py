@@ -15,6 +15,7 @@ import os
 import subprocess
 import json
 import logging
+import tempfile
 
 from pyclowder.extractors import Extractor
 from pyclowder.utils import CheckMessage
@@ -88,9 +89,19 @@ class HyperspectralRaw2NetCDF(Extractor):
 
 		metafile = None
 		ds_metafile = None
+		last_path = None
+		path_match = None
 		for f in resource['local_paths']:
 			for fileExt in target_files.keys():
 				if f.endswith(fileExt) and fileExt != '_metadata.json':
+					filedir = f.replace(os.path.basename(f), "")
+					if not last_path:
+						last_path = filedir
+					else:
+						if filedir != last_path:
+							path_match = False
+						last_path = filedir
+
 					target_files[fileExt] = {
 						'filename': os.path.basename(f),
 						'path': f
@@ -105,7 +116,7 @@ class HyperspectralRaw2NetCDF(Extractor):
 			if ds_metafile != None:
 				# Found dataset metadata, so check for the .json file alongside other files
 				logging.info("...checking for local metadata file alongside other files")
-				ds_dir = os.path.basename(target_files['raw']['path'])
+				ds_dir = target_files['raw']['path'].replace(os.path.basename(target_files['raw']['path']), "")
 				ds_files = os.path.listdir(ds_dir)
 				for ds_f in ds_files:
 					if ds_f.endswith("_metadata.json"):
@@ -117,6 +128,15 @@ class HyperspectralRaw2NetCDF(Extractor):
 			target_files['_metadata.json'] = {'filename': os.path.basename(metafile),
 											  'path': metafile}
 
+		# Move all inputs into one directory if they aren't already
+		if not path_match:
+			newdir = tempfile.mkdtemp()
+			for f in range(len(target_files)):
+				currf = target_files[f]
+				newf = os.path.join(newdir, currf['filename'])
+				os.rename(currf['path'], newf)
+				target_files[f]['path'] = newf
+
 		# Prep output location
 		try:
 			date_portion = resource['dataset_info']['name'].split(' - ')[1].split('__')[0]
@@ -124,6 +144,7 @@ class HyperspectralRaw2NetCDF(Extractor):
 		except:
 			date_portion = resource['dataset_info']['name']
 			timestamp_portion = ""
+		# TODO: Differentiate VNIR and SWIR here
 		outFilePath = os.path.join(self.output_dir,
 								   date_portion,
 								   timestamp_portion,
