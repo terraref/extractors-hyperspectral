@@ -134,6 +134,14 @@ class HyperspectralRaw2NetCDF(Extractor):
 			for f in target_files.keys():
 				currf = target_files[f]
 				if currf['filename'] == '_dataset_metadata.json':
+					# Open the file and change the JSON contents
+					with open(currf['path'], 'r') as mdfile:
+						jsondata = json.load(mdfile)
+					for j in jsondata:
+						if 'content' in j:
+							if 'lemnatec_measurement_metadata' in j['content']:
+								with open(currf['path'], 'w') as mdfile:
+									json.dump(j['content'], mdfile)
 					newf = os.path.join(newdir, target_files['raw']['filename'].replace("_raw","")+'_metadata.json')
 				else:
 					newf = os.path.join(newdir, currf['filename'])
