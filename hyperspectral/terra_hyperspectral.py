@@ -131,7 +131,7 @@ class HyperspectralRaw2NetCDF(Extractor):
 		# Move all inputs into one directory if they aren't already
 		if not path_match:
 			newdir = tempfile.mkdtemp()
-			for f in range(len(target_files)):
+			for f in target_files.keys():
 				currf = target_files[f]
 				newf = os.path.join(newdir, currf['filename'])
 				os.rename(currf['path'], newf)
