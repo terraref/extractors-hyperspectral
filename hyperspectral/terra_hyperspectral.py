@@ -133,8 +133,14 @@ class HyperspectralRaw2NetCDF(Extractor):
 			newdir = tempfile.mkdtemp()
 			for f in target_files.keys():
 				currf = target_files[f]
-				newf = os.path.join(newdir, currf['filename'])
+				if currf['filename'] == '_dataset_metadata.json':
+					newf = os.path.join(newdir, target_files['raw']['filename'].replace("_raw",""), '_metadata.json')
+					target_files[f]['oldfilename'] = '_dataset_metadata.json'
+					target_files[f]['filename'] = '_metadata.json'
+				else:
+					newf = os.path.join(newdir, currf['filename'])
 				os.rename(currf['path'], newf)
+				target_files[f]['oldpath'] = target_files[f]['path']
 				target_files[f]['path'] = newf
 
 		# Prep output location
@@ -168,6 +174,15 @@ class HyperspectralRaw2NetCDF(Extractor):
 				pyclowder.files.upload_to_dataset(connector, host, secret_key, resource['id'], outFilePath)
 		else:
 			logging.error('no output file was produced')
+
+		# Move temp files back to original location so pyclowder2 can clean them
+		if not path_match:
+			for f in target_files.keys():
+				if 'oldpath' in target_files[f]:
+					os.rename(target_files[f]['path'], target_files[f]['oldpath'])
+				if 'oldfilename' in target_files[f]:
+					os.rename(target_files[f]['oldpath'], target_files[f]['oldpath'].replace(
+							target_files[f]['filename'], target_files[f]['oldfilename']))
 
 # Find as many expected files as possible and return the set.
 def get_all_files(resource):
