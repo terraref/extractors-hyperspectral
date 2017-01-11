@@ -6,7 +6,7 @@
   "author": "Charlie Zender",
   "contributors": [],
   "contexts": [],
-  "repository": {"repType": "git", "repUrl": "https://opensource.ncsa.illinois.edu/stash/scm/cats/pyclowder2.git"},
+  "repository": {"repType": "git", "repUrl": "https://github.com/terraref/extractors-hyperspectral.git"},
   "process": {
     "dataset": [
       "file.added"
