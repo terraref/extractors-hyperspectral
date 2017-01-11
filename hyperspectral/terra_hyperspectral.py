@@ -91,6 +91,8 @@ class HyperspectralRaw2NetCDF(Extractor):
 		ds_metafile = None
 		last_path = None
 		path_match = None
+		tempdir = None
+		symlinks = []
 		for f in resource['local_paths']:
 			for fileExt in target_files.keys():
 				if f.endswith(fileExt) and fileExt != '_metadata.json':
@@ -128,13 +130,13 @@ class HyperspectralRaw2NetCDF(Extractor):
 			target_files['_metadata.json'] = {'filename': os.path.basename(metafile),
 											  'path': metafile}
 
-		# Move all inputs into one directory if they aren't already
+		# Create symlinks in one directory if inputs aren't in the same one
 		if not path_match:
-			newdir = tempfile.mkdtemp()
+			tempdir = tempfile.mkdtemp()
 			for f in target_files.keys():
 				currf = target_files[f]
 				if currf['filename'] == '_dataset_metadata.json':
-					# Open the file and change the JSON contents
+					# Open the temporary file and change the JSON content format
 					with open(currf['path'], 'r') as mdfile:
 						jsondata = json.load(mdfile)
 					for j in jsondata:
@@ -142,12 +144,11 @@ class HyperspectralRaw2NetCDF(Extractor):
 							if 'lemnatec_measurement_metadata' in j['content']:
 								with open(currf['path'], 'w') as mdfile:
 									json.dump(j['content'], mdfile)
-					newf = os.path.join(newdir, target_files['raw']['filename'].replace("_raw","")+'_metadata.json')
+					newf = os.path.join(tempdir, target_files['raw']['filename'].replace("_raw","")+'_metadata.json')
 				else:
-					newf = os.path.join(newdir, currf['filename'])
-				os.rename(currf['path'], newf)
-				target_files[f]['oldpath'] = target_files[f]['path']
-				target_files[f]['path'] = newf
+					newf = os.path.join(tempdir, currf['filename'])
+				os.symlink(currf['path'], newf)
+				symlinks.append(newf)
 
 		# Prep output location
 		try:
@@ -181,11 +182,11 @@ class HyperspectralRaw2NetCDF(Extractor):
 		else:
 			logging.error('no output file was produced')
 
-		# Move temp files back to original location so pyclowder2 can clean them
-		if not path_match:
-			for f in target_files.keys():
-				if 'oldpath' in target_files[f]:
-					os.rename(target_files[f]['path'], target_files[f]['oldpath'])
+		# Remove symlinks and temp directory
+		for sym in symlinks:
+			os.remove(sym)
+		if tempdir:
+			os.rmdir(tempdir)
 
 # Find as many expected files as possible and return the set.
 def get_all_files(resource):
