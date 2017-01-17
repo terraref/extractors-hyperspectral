@@ -50,9 +50,13 @@ def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption):
     ######################### Load necessary data #########################
     with open(jsonFileLocation) as fileHandler:
         master = json.loads(fileHandler.read())["lemnatec_measurement_metadata"]
-        
-        x_gantry_pos = float(master["gantry_system_variable_metadata"]["position x [m]"])
-        y_gantry_pos = float(master["gantry_system_variable_metadata"]["position y [m]"])
+
+        if "position x [m]" in master["gantry_system_variable_metadata"]:
+            x_gantry_pos = float(master["gantry_system_variable_metadata"]["position x [m]"])
+            y_gantry_pos = float(master["gantry_system_variable_metadata"]["position y [m]"])
+        else:
+            x_gantry_pos = float(master["gantry_system_variable_metadata"]["Position x [m]"])
+            y_gantry_pos = float(master["gantry_system_variable_metadata"]["Position y [m]"])
 
         x_camera_pos = 1.9 # From https://github.com/terraref/reference-data/issues/32
         y_camera_pos = 0.855
