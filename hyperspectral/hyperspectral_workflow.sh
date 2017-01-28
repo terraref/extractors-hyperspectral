@@ -2,7 +2,7 @@
 
 # Purpose: Convert raw imagery from 2D raster to 3D compressed netCDF annotated with metadata
 
-# Source: https://github.com/terraref/computing-pipeline/tree/master/scripts/hyperspectral/hyperspectral_workflow.sh
+# Source: https://github.com/terraref/extractors-hyperspectral/tree/master/hyperspectral/hyperspectral_workflow.sh
 
 # Documentation:
 # https://docs.google.com/document/d/1w_zHHlrPVKsy1mnW9wrVzAU2edVqZH8i1IZa5BZxVpo/edit#heading=h.jjfbhbos05cc # Calibration employed since 20160908
@@ -17,7 +17,7 @@
 # conda install netCDF4
 
 # Direct install:
-# scp ~/terraref/computing-pipeline/scripts/hyperspectral/hyperspectral_workflow.sh roger-login.ncsa.illinois.edu:terraref/computing-pipeline/scripts/hyperspectral/hyperspectral_workflow.sh
+# scp ~/terraref/extractors-hyperspectral/hyperspectral/hyperspectral_workflow.sh roger-login.ncsa.illinois.edu:terraref/extractors-hyperspectral/hyperspectral/hyperspectral_workflow.sh
 
 # Set script name, directory, PID, run directory
 drc_pwd=${PWD}
@@ -67,6 +67,9 @@ esac # !HOSTNAME
 #       qsub -A arpae -l walltime=03:00:00 -l nodes=1 -N hyperspectral -q batch -j oe -m e -o ~/hyperspectral.out ~/hyperspectral.pbs # Dedicated non-interactive compute node in batch queue in batch mode
 #       hyperspectral_workflow.sh -d 1 -i /projects/arpae/terraref/sites/ua-mac/raw_data/VNIR/2016-10-07/2016-10-07__12-12-09-294/755e5eca-55b7-4412-a145-e8d1d4833b3f_raw > ~/foo 2>&1 & # Process full-scan (~62 GB raw image)
 # UCI:  ls -R ${DATA}/terraref/MovingSensor/VNIR/2016-04-07/*/*_raw | hyperspectral_workflow.sh -d 1 -O ~/rgr > ~/hyperspectral.out 2>&1 &
+# Extractor writes output to Roger at:
+# /projects/arpae/terraref/sites/ua-mac/Level_1/hyperspectral
+# ua-mac/Level_1/hyperspectral
 
 # Test cases (for Charlie's machines)
 # hyperspectral_workflow.sh $fl > ~/hyperspectral.out 2>&1 &

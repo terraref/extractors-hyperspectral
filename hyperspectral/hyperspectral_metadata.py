@@ -34,7 +34,7 @@ Usage:
 python hyperspectral_metadata.py dbg=yes fmt=4 ftn=no in.json out.nc
 
 Example:
-python ${HOME}/terraref/computing-pipeline/scripts/hyperspectral/hyperspectral_metadata.py dbg=yes fmt=4 ftn=no ${DATA}/terraref/VNIR/2016-10-06/2016-10-06__15-21-20-178/b73a4f00-4140-4576-8c70-8e1d26ae245e_raw ~/foo.nc
+python ${HOME}/terraref/extractors-hyperspectral/hyperspectral/hyperspectral_metadata.py dbg=yes fmt=4 ftn=no ${DATA}/terraref/VNIR/2016-10-06/2016-10-06__15-21-20-178/b73a4f00-4140-4576-8c70-8e1d26ae245e_raw ~/foo.nc
 
 If pointed to a directory rather than a file, hyperspectral_metadata.py will authomatically find data_raw, data_metadata.json and data_raw.hdr
 ----------------------------------------------------------------------------------------
