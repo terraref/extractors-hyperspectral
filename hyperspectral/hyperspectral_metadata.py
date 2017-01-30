@@ -158,9 +158,13 @@ class DataContainer(object):
                     setattr(tempGroup, _reformat_string(subkey), subdata)
 
                 else: #Case for digits variables
-                    if "time" in data or "Time" in data or "timestamp" in data:
-                        print "catched:", data["time"]
+                    if "time" in data: 
                         gantry_system_time = data["time"]
+                    elif "Time" in data:
+                        gantry_system_time = data["Time"]
+                    elif "timestamp" in data:
+                        gantry_system_time = data["timestamp"]
+
                     setattr(tempGroup, _reformat_string(subkey), subdata)
 
                     short_name, attributes = _generate_attr(subkey)
