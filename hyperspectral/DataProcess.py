@@ -18,7 +18,7 @@ DataPath        is where the data file locates
 header file***
 
 Example:
-python ${HOME}/terraref/computing-pipeline/scripts/hyperspectral/DataProcess.py data
+python ${HOME}/terraref/extractors-hyperspectral/hyperspectral/DataProcess.py data
 ----------------------------------------------------------------------------------------
 Process:
 Professor Zender noticed that the image is "interleaved," which "ruined" the output image
