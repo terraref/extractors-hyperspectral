@@ -152,6 +152,7 @@ class DataContainer(object):
                         assert subdata != "todo", '"todo" is not a legal value for the keys'
 
                         tempVariable = tempGroup.createVariable(_reformat_string(subkey), 'f8')
+                        print "subkey is", subkey
                         tempVariable[...] = translate_time(subdata)
                         setattr(tempVariable, "units",     "days since 1970-01-01 00:00:00")
                         setattr(tempVariable, "calender", "gregorian")
