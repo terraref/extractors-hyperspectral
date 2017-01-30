@@ -159,6 +159,7 @@ class DataContainer(object):
 
                 else: #Case for digits variables
                     if "time" in data or "Time" in data or "timestamp" in data:
+                        print "catched:", data["time"]
                         gantry_system_time = data["time"]
                     setattr(tempGroup, _reformat_string(subkey), subdata)
 
@@ -468,7 +469,7 @@ def _generate_attr(string):
                {
                    "long_name": _reformat_string(string) 
                }
-               
+
     elif "speed" in string and "current setting" not in string:
         long_name = "".join(('Gantry Speed in ', string[6].upper(), ' Direction'))
         return _reformat_string(string),\
