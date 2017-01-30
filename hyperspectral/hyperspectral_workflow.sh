@@ -155,6 +155,7 @@ anl_flg='Yes' # [sng] Analysis
 att_flg='Yes' # [sng] Add workflow-specific metadata
 clb_flg='Yes' # [sng] Calibrate data
 cmp_flg='No' # [sng] Compress and/or pack data
+hsi_flg='No' # [sng] Calculate hyperspectral indices from NetCDF file
 jsn_flg='Yes' # [sng] Parse metadata from JSON to netCDF
 mrg_flg='Yes' # [sng] Merge JSON metadata with image data
 rip_flg='Yes' # [sng] Move to final resting place
@@ -207,10 +208,11 @@ fi # !arg_nbr
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 # http://tuxtweaks.com/2014/05/bash-getopts
 cmd_ln="${spt_nm} ${@}"
-while getopts c:d:C:I:i:j:N:n:O:o:p:T:t:u:x OPT; do
+while getopts c:d:hI:i:j:N:n:O:o:p:T:t:u:x OPT; do
     case ${OPT} in
 	c) dfl_lvl=${OPTARG} ;; # Compression deflate level
 	d) dbg_lvl=${OPTARG} ;; # Debugging level
+	h) hsi_flg='Yes' ;; # Create hyperspectral indices NetCDF file
 	I) drc_in=${OPTARG} ;; # Input directory
 	i) in_fl=${OPTARG} ;; # Input file
 	j) job_usr=${OPTARG} ;; # Job simultaneity
@@ -254,6 +256,7 @@ anl_fl="${drc_tmp}/terraref_tmp_anl.nc" # [sng] Analysis
 att_fl="${drc_tmp}/terraref_tmp_att.nc" # [sng] ncatted file
 clb_fl="${drc_tmp}/terraref_tmp_clb.nc" # [sng] Calibrate file
 cmp_fl="${drc_tmp}/terraref_tmp_cmp.nc" # [sng] Compress/pack file
+hsi_fl="${drc_tmp}/terraref_tmp_hsi.nc" # [sng] HSI file
 jsn_fl="${drc_tmp}/terraref_tmp_jsn.nc" # [sng] JSON file
 mrg_fl="${drc_tmp}/terraref_tmp_mrg.nc" # [sng] Merge file
 trn_fl="${drc_tmp}/terraref_tmp_trn.nc" # [sng] Translate file
@@ -273,6 +276,7 @@ anl_fl=${anl_fl}${unq_sfx}
 att_fl=${att_fl}${unq_sfx}
 clb_fl=${clb_fl}${unq_sfx}
 cmp_fl=${cmp_fl}${unq_sfx}
+hsi_fl=${hsi_fl}${unq_sfx}
 jsn_fl=${jsn_fl}${unq_sfx}
 mrg_fl=${mrg_fl}${unq_sfx}
 trn_fl=${trn_fl}${unq_sfx}
@@ -415,6 +419,7 @@ if [ ${dbg_lvl} -ge 2 ]; then
     printf "dbg: drc_tmp  = ${drc_tmp}\n"
     printf "dbg: gaa_sng  = ${gaa_sng}\n"
     printf "dbg: hdr_pad  = ${hdr_pad}\n"
+    printf "dbg: hsi_flg  = ${hsi_flg}\n"
     printf "dbg: job_nbr  = ${job_nbr}\n"
     printf "dbg: in_fl    = ${in_fl}\n"
     printf "dbg: mpi_flg  = ${mpi_flg}\n"
@@ -651,10 +656,10 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	# Hence perform calibration as root-level append operation, then, if successful, move file to output file
 	#cmd_clb[${fl_idx}]="ncap2 -A -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_in}"
 	#drc_spt_var="\*drc_spt='\"${drc_spt}\"s'" # OK, passes string into variable
-	 drc_spt_att="@drc_spt='\"${drc_spt}\"'" 
-	 # NCO_PATH environment variable required for hyperspectral_calibration.nco to find hyperspectral_spectralon_reflectance_factory.nco
-	 export NCO_PATH="${drc_spt}"
-	 cmd_clb[${fl_idx}]="ncap2 -A ${nco_opt} -s ${drc_spt_att} -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_in}"
+	drc_spt_att="@drc_spt='\"${drc_spt}\"'" 
+	# NCO_PATH environment variable required for hyperspectral_calibration.nco to find hyperspectral_spectralon_reflectance_factory.nco
+	export NCO_PATH="${drc_spt}"
+	cmd_clb[${fl_idx}]="ncap2 -A ${nco_opt} -s ${drc_spt_att} -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_in}"
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_clb[${fl_idx}]}
 	fi # !dbg
@@ -676,6 +681,26 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 		exit 1
 	    fi # !err
 	fi # !dbg
+
+	# Calculate hyperspectral indices file 
+	if [ "${hsi_flg}" = 'Yes' ]; then
+            hsi_in=${clb_out}
+            hsi_out="${out_fl/.nc/_ind.nc}"    
+	    printf "hsi(in)  : ${hsi_in}\n"
+	    printf "hsi(out) : ${hsi_out}\n"
+	    cmd_hsi[${fl_idx}]="ncap2 -O -S ${drc_spt}/hyperspectral_indices_make.nco ${hsi_in} ${hsi_out}"
+	    if [ ${dbg_lvl} -ge 1 ]; then
+		echo ${cmd_hsi[${fl_idx}]}
+	    fi # !dbg
+	    if [ ${dbg_lvl} -ne 2 ]; then
+		eval ${cmd_hsi[${fl_idx}]}
+		if [ $? -ne 0 ] || [ ! -f ${hsi_out} ]; then
+		    printf "${spt_nm}: ERROR Failed to create hypserspectral indices. Debug this:\n${cmd_hsi[${fl_idx}]}\n"
+		    exit 1
+		fi # !err
+	    fi # !dbg
+	fi # !hsi_flg
+        
     fi # !clb_flg
 
     # Compress and/or pack final data file
