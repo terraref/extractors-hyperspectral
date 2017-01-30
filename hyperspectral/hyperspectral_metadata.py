@@ -138,7 +138,8 @@ class DataContainer(object):
         delattr(self, "header_info")
 
         #### default camera is SWIR, but will see based on the number of wavelengths
-        camera_opt = "SWIR"
+        camera_opt         = "SWIR"
+        gantry_system_time = ""
 
         ##### Write the data from metadata to netCDF #####
         for key, data in self.__dict__.items():
