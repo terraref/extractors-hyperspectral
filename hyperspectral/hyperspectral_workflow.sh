@@ -155,6 +155,7 @@ anl_flg='Yes' # [sng] Analysis
 att_flg='Yes' # [sng] Add workflow-specific metadata
 clb_flg='Yes' # [sng] Calibrate data
 cmp_flg='No' # [sng] Compress and/or pack data
+hsi_flg='No' # [sng] Calculate hyperspectral indices from NetCDF file
 jsn_flg='Yes' # [sng] Parse metadata from JSON to netCDF
 mrg_flg='Yes' # [sng] Merge JSON metadata with image data
 rip_flg='Yes' # [sng] Move to final resting place
@@ -207,10 +208,11 @@ fi # !arg_nbr
 # http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
 # http://tuxtweaks.com/2014/05/bash-getopts
 cmd_ln="${spt_nm} ${@}"
-while getopts c:d:C:I:i:j:N:n:O:o:p:T:t:u:x OPT; do
+while getopts c:d:C:h:I:i:j:N:n:O:o:p:T:t:u:x OPT; do
     case ${OPT} in
 	c) dfl_lvl=${OPTARG} ;; # Compression deflate level
 	d) dbg_lvl=${OPTARG} ;; # Debugging level
+	h) hsi_flg=${OPTARG} ;; # create hyperspectral indices NetCDF file
 	I) drc_in=${OPTARG} ;; # Input directory
 	i) in_fl=${OPTARG} ;; # Input file
 	j) job_usr=${OPTARG} ;; # Job simultaneity
@@ -699,7 +701,31 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	rip_in=${clb_out}
     fi # !cmp_flg
 
+    # calculate hyperspectral indices file 
     # Move file to final resting place
+    if [ "${hsi_flg}" = 'Yes' ]; then
+	if [ "${cmp_flg}" = 'Yes' ]; then
+            hsi_in=${cmp_out};  
+        else
+            hsi_in=${clb_out}
+        fi
+        hsi_out="${hsi_in/.nc/_ind.nc}"    
+
+	export NCO_PATH="${drc_spt}"
+	cmd_clb[${fl_idx}]="ncap2 -S ${drc_spt}/hyperspectral_indices_make.nco  ${hsi_in} ${hsi_out}"
+	if [ ${dbg_lvl} -ge 1 ]; then
+	    echo ${cmd_clb[${fl_idx}]}
+	fi # !dbg
+	if [ ${dbg_lvl} -ne 2 ]; then
+	    eval ${cmd_clb[${fl_idx}]}
+	    if [ $? -ne 0 ]; then
+		printf "${spt_nm}: ERROR Failed to create hyperspectral indices with ncap2. Debug this:\n${cmd_clb[${fl_idx}]}\n"
+		exit 1
+	    fi # !err
+	fi # !dbg
+    fi  
+        
+      # Move file to final resting place
     if [ "${rip_flg}" = 'Yes' ]; then
 	if [ "${cmp_flg}" = 'Yes' ]; then
 	    rip_in=${cmp_out}
@@ -707,7 +733,16 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	rip_out=${out_fl}
 	printf "rip(in)  : ${rip_in}\n"
 	printf "rip(out) : ${rip_out}\n"
-	cmd_rip[${fl_idx}]="/bin/mv -f ${rip_in} ${rip_out}"
+
+        if [ "${hsi_flg}" = 'Yes' ]; then
+          hsi_out_rip=${rip_out/.nc/_ind.nc};
+          printf "hsi_out  : ${hsi_out}\n"         
+          printf "hsi_out_rip : ${hsi_out_rip}\n"        
+          cmd_rip[${fl_idx}]="/bin/mv -f ${rip_in} ${rip_out} ; /bin/mv -f ${hsi_out} ${hsi_out_rip}"  
+        else
+	  cmd_rip[${fl_idx}]="/bin/mv -f ${rip_in} ${rip_out}"
+        fi
+ 
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_rip[${fl_idx}]}
 	fi # !dbg
