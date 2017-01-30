@@ -152,6 +152,7 @@ class DataContainer(object):
                         assert subdata != "todo", '"todo" is not a legal value for the keys'
 
                         tempVariable = tempGroup.createVariable(_reformat_string(subkey), 'f8')
+                        print "subkey is", subkey
                         tempVariable[...] = translate_time(subdata)
                         setattr(tempVariable, "units",     "days since 1970-01-01 00:00:00")
                         setattr(tempVariable, "calender", "gregorian")
@@ -193,7 +194,6 @@ class DataContainer(object):
         assert len(tempFrameTime), "ERROR: Failed to collect frame time information from " + ''.join((inputFilePath.strip("raw"), "frameIndex.txt")) + ". Please check the file."
        
         frameTime      = netCDFHandler.createVariable("frametime", "f8", ("time",))
-        print tempFrameTime[0]
         frameTime[...] = tempFrameTime
         setattr(frameTime, "units",    "days since 1970-01-01 00:00:00")
         setattr(frameTime, "calender", "gregorian")
@@ -536,6 +536,9 @@ def translate_time(gantry_system_time, frameTimeString=None):
         timeUnpack = datetime.strptime(gantry_system_time, "%m/%d/%Y %H:%M:%S").timetuple()
     elif time_pattern[0].match(gantry_system_time):
         timeUnpack = datetime.strptime(gantry_system_time, "%Y-%m-%d").timetuple()
+    else:
+        print "uncatched pattern", time_pattern
+        return 0
 
     timeSplit  = date(year=timeUnpack.tm_year, month=timeUnpack.tm_mon,
                       day=timeUnpack.tm_mday) - _unix_basetime #time period to the UNIX basetime
