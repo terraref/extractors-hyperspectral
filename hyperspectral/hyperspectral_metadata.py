@@ -537,7 +537,7 @@ def translate_time(gantry_system_time, frameTimeString=None):
     elif time_pattern[0].match(gantry_system_time):
         timeUnpack = datetime.strptime(gantry_system_time, "%Y-%m-%d").timetuple()
     else:
-        print "uncatched pattern", time_pattern
+        print "uncatched pattern", gantry_system_time
         return 0
 
     timeSplit  = date(year=timeUnpack.tm_year, month=timeUnpack.tm_mon,
