@@ -464,6 +464,11 @@ def _generate_attr(string):
     long_name = ""
     if "current setting" in string:
         long_name = string.split(' ')[-1]
+        return long_name,\
+               {
+                   "long_name": _reformat_string(string) 
+               }
+               
     elif "speed" in string and "current setting" not in string:
         long_name = "".join(('Gantry Speed in ', string[6].upper(), ' Direction'))
         return _reformat_string(string),\
