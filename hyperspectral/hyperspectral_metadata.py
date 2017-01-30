@@ -161,9 +161,10 @@ class DataContainer(object):
 
                     setattr(tempGroup, _reformat_string(subkey), subdata)
 
-                else: #Case for digits variables
                     if "timestamp" in subkey or "time" in subkey or "Time" in subkey:
                         gantry_system_time = subdata
+
+                else: #Case for digits variables
 
                     setattr(tempGroup, _reformat_string(subkey), subdata)
 
