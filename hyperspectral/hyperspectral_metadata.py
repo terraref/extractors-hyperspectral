@@ -145,6 +145,7 @@ class DataContainer(object):
         for key, data in self.__dict__.items():
             tempGroup = netCDFHandler.createGroup(key) if not flatten else netCDFHandler
             for subkey, subdata in data.items():
+                print subkey
                 if not _IS_DIGIT(subdata): #Case for letter variables
 
                     ##### For date variables #####
