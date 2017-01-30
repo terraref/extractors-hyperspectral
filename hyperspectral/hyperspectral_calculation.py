@@ -54,9 +54,13 @@ def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption):
         if "position x [m]" in master["gantry_system_variable_metadata"]:
             x_gantry_pos = float(master["gantry_system_variable_metadata"]["position x [m]"])
             y_gantry_pos = float(master["gantry_system_variable_metadata"]["position y [m]"])
-        else:
+
+        elif "Position x [m]" in master["gantry_system_variable_metadata"]:
             x_gantry_pos = float(master["gantry_system_variable_metadata"]["Position x [m]"])
             y_gantry_pos = float(master["gantry_system_variable_metadata"]["Position y [m]"])
+
+        else: # We notice that there are cases that no position data available
+            return 0, 0, [0]*4 , ""
 
         x_camera_pos = 1.9 # From https://github.com/terraref/reference-data/issues/32
         y_camera_pos = 0.855
