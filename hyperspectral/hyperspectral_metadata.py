@@ -186,7 +186,6 @@ class DataContainer(object):
         write_header_file(inputFilePath, netCDFHandler, flatten, _debug)
 
         ##### Write the data from frameIndex files to netCDF #####
-        print "gantry time is", gantry_system_time
         tempFrameTime = frame_index_parser(''.join((inputFilePath.strip("raw"), "frameIndex.txt")), gantry_system_time)
         netCDFHandler.createDimension("time", len(tempFrameTime))
 
