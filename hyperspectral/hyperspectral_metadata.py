@@ -152,7 +152,6 @@ class DataContainer(object):
                         assert subdata != "todo", '"todo" is not a legal value for the keys'
 
                         tempVariable = tempGroup.createVariable(_reformat_string(subkey), 'f8')
-                        print "subkey is", subkey
                         tempVariable[...] = translate_time(subdata)
                         setattr(tempVariable, "units",     "days since 1970-01-01 00:00:00")
                         setattr(tempVariable, "calender", "gregorian")
@@ -194,6 +193,7 @@ class DataContainer(object):
         assert len(tempFrameTime), "ERROR: Failed to collect frame time information from " + ''.join((inputFilePath.strip("raw"), "frameIndex.txt")) + ". Please check the file."
        
         frameTime      = netCDFHandler.createVariable("frametime", "f8", ("time",))
+        print tempFrameTime[0]
         frameTime[...] = tempFrameTime
         setattr(frameTime, "units",    "days since 1970-01-01 00:00:00")
         setattr(frameTime, "calender", "gregorian")
