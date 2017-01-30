@@ -533,7 +533,7 @@ def translate_time(gantry_system_time, frameTimeString=None):
     time_pattern      = re.compile(r'(\d{4})-(\d{2})-(\d{2})'),\
                         re.compile(r'(\d{2})/(\d{2})/(\d{4})\s(\d{2}):(\d{2}):(\d{2})'),\
                         re.compile(r'(\d{2}):(\d{2}):(\d{2})')
-    print "the gantry time is", gantry_system_time
+    print "the gantry time is", type(gantry_system_time)
     if frameTimeString:
         hourUnpack = datetime.strptime(frameTimeString, "%H:%M:%S").timetuple()
     
