@@ -154,6 +154,7 @@ class DataContainer(object):
                         tempVariable = tempGroup.createVariable(_reformat_string(subkey), 'f8')
                         print "subkey is", subkey
                         tempVariable[...] = translate_time(subdata)
+                        print "pass"
                         setattr(tempVariable, "units",     "days since 1970-01-01 00:00:00")
                         setattr(tempVariable, "calender", "gregorian")
 
