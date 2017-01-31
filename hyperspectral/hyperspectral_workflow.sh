@@ -31,6 +31,7 @@ while [ -h "${spt_src}" ]; do # Recursively resolve ${spt_src} until file is no 
   spt_src="$(readlink "${spt_src}")"
   [[ ${spt_src} != /* ]] && spt_src="${drc_spt}/${spt_src}" # If ${spt_src} was relative symlink, resolve it relative to path where symlink file was located
 done
+cmd_ln="${spt_src} ${@}"
 drc_spt="$( cd -P "$( dirname "${spt_src}" )" && pwd )"
 spt_nm=$(basename ${spt_src}) # [sng] Script name (Unlike $0, ${BASH_SOURCE[0]} works well with 'source <script>')
 spt_pid=$$ # [nbr] Script PID (process ID)
@@ -117,7 +118,7 @@ drc_out="${drc_pwd}" # [sng] Output file directory
 drc_out_xmp='drc_out' # [sng] Output file directory for examples
 flg_swir='No' # [flg] SWIR camera
 flg_vnir='No' # [flg] VNIR camera
-gaa_sng="--gaa terraref_script=${spt_nm} --gaa terraref_hostname=${HOSTNAME} --gaa terraref_version=${nco_vrs}" # [sng] Global attributes to add
+gaa_sng="--gaa terraref_script=${spt_nm} --gaa workflow_invocation=\"'${cmd_ln}'\" --gaa terraref_hostname=${HOSTNAME} --gaa terraref_version=${nco_vrs}" # [sng] Global attributes to add
 hdr_pad='10000' # [B] Pad at end of header section
 in_fl='' # [sng] Input file stub
 in_xmp='test_raw' # [sng] Input file for examples
@@ -204,10 +205,6 @@ if [ ${arg_nbr} -eq 0 ]; then
   fnc_usg_prn
 fi # !arg_nbr
 
-# Parse command-line options:
-# http://stackoverflow.com/questions/402377/using-getopts-in-bash-shell-script-to-get-long-and-short-command-line-options
-# http://tuxtweaks.com/2014/05/bash-getopts
-cmd_ln="${spt_nm} ${@}"
 while getopts c:d:C:h:I:i:j:N:n:O:o:p:T:t:u:x OPT; do
     case ${OPT} in
 	c) dfl_lvl=${OPTARG} ;; # Compression deflate level
