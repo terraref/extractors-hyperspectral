@@ -138,7 +138,7 @@ class DataContainer(object):
         delattr(self, "header_info")
 
         #### default camera is SWIR, but will see based on the number of wavelengths
-        camera_opt = "SWIR"
+        camera_opt         = "SWIR"
 
         ##### Write the data from metadata to netCDF #####
         for key, data in self.__dict__.items():
@@ -157,11 +157,11 @@ class DataContainer(object):
 
                     setattr(tempGroup, _reformat_string(subkey), subdata)
 
+                    if "timestamp" in subkey or "time" in subkey or "Time" in subkey:
+                        gantry_system_time = subdata
+
                 else: #Case for digits variables
-                    if "time" in data:
-                        yearMonthDate = data["time"]
-                    elif "Time" in data:
-                        yearMonthDate = data["Time"]
+
                     setattr(tempGroup, _reformat_string(subkey), subdata)
 
                     short_name, attributes = _generate_attr(subkey)
@@ -186,7 +186,7 @@ class DataContainer(object):
         write_header_file(inputFilePath, netCDFHandler, flatten, _debug)
 
         ##### Write the data from frameIndex files to netCDF #####
-        tempFrameTime = frame_index_parser(''.join((inputFilePath.strip("raw"), "frameIndex.txt")), yearMonthDate)
+        tempFrameTime = frame_index_parser(''.join((inputFilePath.strip("raw"), "frameIndex.txt")), gantry_system_time)
         netCDFHandler.createDimension("time", len(tempFrameTime))
 
         # Check if the frame time information is correctly collected
@@ -466,39 +466,43 @@ def _generate_attr(string):
     long_name = ""
     if "current setting" in string:
         long_name = string.split(' ')[-1]
-    elif "speed" in string and "current setting" not in string:
-        long_name = "".join(('Gantry Speed in ', string[6].upper(), ' Direction'))
-    elif "Velocity" in string or "velocity" in string:
-        long_name = "".join(('Gantry velocity in ', string[9].upper(), ' Direction'))
-    elif "Position" in string or "position" in string:
-        long_name = "".join(('Position in ', string[9].upper(), ' Direction'))
-    else:
-        long_name = _reformat_string(string)
-
-    if 'Position' in string or 'position' in string:
-        return _reformat_string(string),\
-               {
-                   "units"    : _UNIT_DICTIONARY[string[string.find('[') + 1:string.find(']')]],
-                   "long_name": long_name
-               }
-    elif 'Velocity' in string or 'velocity' in string:
-        return _reformat_string(string),\
-               {
-                   "units"    : _UNIT_DICTIONARY[string[string.find('[') + 1:string.find(']')]],
-                   "long_name": long_name
-               }
-    elif 'speed' in string and "current setting" not in string:
-        return _reformat_string(string),\
-               {
-                   "units"    : _UNIT_DICTIONARY[string[string.find('[') + 1:string.find(']')]],
-                   "long_name": long_name
-               }
-    else:
         return long_name,\
                {
                    "long_name": _reformat_string(string) 
                }
-               
+
+    elif "speed" in string and "current setting" not in string:
+        long_name = "".join(('Gantry Speed in ', string[6].upper(), ' Direction'))
+        return _reformat_string(string),\
+               {
+                   "units"    : _UNIT_DICTIONARY[string[string.find('[') + 1:string.find(']')]],
+                   "long_name": long_name
+               }
+
+    elif "Velocity" in string or "velocity" in string:
+        long_name = "".join(('Gantry velocity in ', string[9].upper(), ' Direction'))
+        return _reformat_string(string),\
+               {
+                   "units"    : _UNIT_DICTIONARY[string[string.find('[') + 1:string.find(']')]],
+                   "long_name": long_name
+               }
+
+    elif "Position" in string or "position" in string:
+        long_name = "".join(('Position in ', string[9].upper(), ' Direction'))
+        return _reformat_string(string),\
+               {
+                   "units"    : _UNIT_DICTIONARY[string[string.find('[') + 1:string.find(']')]],
+                   "long_name": long_name
+               }
+
+    else:
+        long_name = _reformat_string(string)
+        return long_name,\
+               {
+                   "long_name": _reformat_string(string) 
+               }
+        
+              
 
 def _filter_the_headings(target):
     '''
@@ -518,20 +522,19 @@ def jsonHandler(jsonFile, _debug=True):
             jsonCheck(fileHandler)
         return json.loads(fileHandler.read(), object_hook=_filter_the_headings)
 
-def translate_time(yearMonthDate, frameTimeString=None):
+def translate_time(gantry_system_time, frameTimeString=None):
     hourUnpack, timeUnpack = None, None
     _unix_basetime    = date(year=1970, month=1, day=1)
     time_pattern      = re.compile(r'(\d{4})-(\d{2})-(\d{2})'),\
                         re.compile(r'(\d{2})/(\d{2})/(\d{4})\s(\d{2}):(\d{2}):(\d{2})'),\
                         re.compile(r'(\d{2}):(\d{2}):(\d{2})')
-
     if frameTimeString:
         hourUnpack = datetime.strptime(frameTimeString, "%H:%M:%S").timetuple()
     
-    if time_pattern[1].match(yearMonthDate):
-        timeUnpack = datetime.strptime(yearMonthDate, "%m/%d/%Y %H:%M:%S").timetuple()
-    elif time_pattern[0].match(yearMonthDate):
-        timeUnpack = datetime.strptime(yearMonthDate, "%Y-%m-%d").timetuple()
+    if time_pattern[1].match(gantry_system_time):
+        timeUnpack = datetime.strptime(gantry_system_time, "%m/%d/%Y %H:%M:%S").timetuple()
+    elif time_pattern[0].match(gantry_system_time):
+        timeUnpack = datetime.strptime(gantry_system_time, "%Y-%m-%d").timetuple()
 
     timeSplit  = date(year=timeUnpack.tm_year, month=timeUnpack.tm_mon,
                       day=timeUnpack.tm_mday) - _unix_basetime #time period to the UNIX basetime
@@ -541,12 +544,12 @@ def translate_time(yearMonthDate, frameTimeString=None):
     else:
         return timeSplit.total_seconds() / (3600.0 * 24.0)
 
-def frame_index_parser(fileName, yearMonthDate):
+def frame_index_parser(fileName, gantry_system_time):
     '''
     translate all the time in *frameIndex.txt
     '''
     with open(fileName) as fileHandler:
-        return [translate_time(yearMonthDate, dataMembers.split()[1]) for dataMembers in fileHandler.readlines()[1:]]
+        return [translate_time(gantry_system_time, dataMembers.split()[1]) for dataMembers in fileHandler.readlines()[1:]]
 
 
 def file_dependency_check(filePath):
