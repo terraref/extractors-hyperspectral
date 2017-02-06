@@ -36,38 +36,88 @@ iR970=min_coords(wavelength, 9.7e-7d);
 
 
 R445=rfl_img(iR445,:,:);
+R445_avg=R445.avg();
+
 R450=rfl_img(iR450,:,:);
+R450_avg=R450.avg();
+
 R470=rfl_img(iR470,:,:);
+R470_avg=R470.avg();
 
 R500=rfl_img(iR500,:,:);
+R500_avg=R500.avg();
+
 R512=rfl_img(iR512,:,:);
+R512_avg=R512.avg();
+
 R531=rfl_img(iR531,:,:);
+R531_avg=R531.avg();
+
 R540=rfl_img(iR540,:,:);
+R540_avg=R540.avg();
+
 R550=rfl_img(iR550,:,:);
+R550_avg=R550.avg();
+
 R570=rfl_img(iR570,:,:);
+R570_avg=R570.avg();
+
 R586=rfl_img(iR586,:,:);
+R586_avg=R586.avg();
+
 R590=rfl_img(iR590,:,:);
+R590_avg=R590.avg();
 
 R600=rfl_img(iR600,:,:);
+R600_avg=R600.avg();
+
 R650=rfl_img(iR650,:,:);
+R650_avg=R650.avg();
+
 R670=rfl_img(iR670,:,:);
+R670_avg=R670.avg();
+
 R680=rfl_img(iR680,:,:);
+R680_avg=R680.avg();
+
 R690=rfl_img(iR690,:,:);
+R690_avg=R690.avg();
 
 R700=rfl_img(iR700,:,:);
+R700_avg=R700.avg();
+
 R705=rfl_img(iR705,:,:);
+R705_avg=R705.avg();
+
 R710=rfl_img(iR710,:,:);
+R710_avg=R710.avg();
+
 R720=rfl_img(iR720,:,:);
+R720_avg=R720.avg();
+
 R740=rfl_img(iR740,:,:);
+R740_avg=R740.avg();
+
 R750=rfl_img(iR750,:,:);
+R750_avg=R750.avg();
+
 R760=rfl_img(iR760,:,:);
+R760_avg=R760.avg();
+
 R780=rfl_img(iR780,:,:);
+R780_avg=R780.avg();
+
 R790=rfl_img(iR790,:,:);
+R790_avg=R790.avg();
 
 R800=rfl_img(iR800,:,:);
+R800_avg=R800.avg();
 
 R900=rfl_img(iR900,:,:);
+R900_avg=R900.avg();
+
 R970=rfl_img(iR970,:,:);
+R970_avg=R970.avg();
 
 
 
@@ -84,88 +134,174 @@ if( fabs(wavelength(iR700)-7e-7) > 0.01e-7d )
   print("wavelength R700 not in wavelength coord\");  
 
 
-NDVI= ( R900 -R680) / (R900+R680 );
+NDVI = ( R900 -R680) / (R900+R680 );
 NDVI@long_name="Normalized Difference Vegetation Index";
+NDVI_avg = ( R900_avg -R680_avg) / (R900_avg+R680_avg );
+NDVI_avg@long_name=NDVI@long_name;
+
 
 SR=R900 / R680;
 SR@long_name="Simple ratio";
+SR_avg=R900_avg / R680_avg;
+SR_avg@long_name=SR@long_name;
+
+
 
 OSAVI=1.16f*( (R800-R670) ) /  ( R800+R670+0.16f);
 OSAVI@long_name="Optimized Soil-Adjusted Vegetation index";
+OSAVI_avg=1.16f*( (R800_avg-R670_avg) ) /  ( R800_avg+R670_avg+0.16f);
+OSAVI_avg@long_name=OSAVI@long_name;
+
 
 WI=R900-R970;
 WI@long_name="water index";
+WI_avg=R900_avg-R970_avg;
+WI_avg@long_name=WI@long_name;
 
-CHL=R750 / R550;
+
+
+CHL_avg=R750 / R550;
 CHL@long_name="Chlorophyll index";
+CHL_avg=R750_avg / R550_avg;
+CHL_avg@long_name=CHL@long_name;
 
 msR705= (R750-R445) / (R705-R445);
 msR705@long_name="Modified simple ratio 705";
+msR705_avg= (R750_avg-R445_avg) / (R705_avg-R445_avg);
+msR705_avg@long_name=msR705@long_name;
 
 
 TCARI=3.0f*(  (R700-R670)-0.2f * (R700-R550) * (R700/R670)  );
 TCARI@long_name="Transformed chlorophyll absorption in reflectance index";
+TCARI_avg=3.0f*(  (R700_avg-R670_avg)-0.2f * (R700_avg-R550_avg) * (R700_avg/R670_avg)  );
+TCARI_avg@long_name=TCARI@long_name;
+
+
 
 CarChap=R760/R500;
 CarChap@long_name="Carotenoid index (Chappelle)";
+CarChap_avg=R760_avg/R500_avg;
+CarChap_avg@long_name=CarChap@long_name;
+
 
 Car1Black=R800/R470;
 Car1Black@long_name="Carotenoid index (BlackBurn)";
+Car1Black_avg=R800_avg/R470_avg;
+Car1Black_avg@long_name=Car1Black@long_name;
+
 
 
 Car2Black= ( R800 - R470 ) / (R800 + R470);
 Car2Black@long_name="Carotenoid index 2 (BlackBurn)";
+Car2Black= ( R800_avg - R470_avg ) / (R800_avg + R470_avg);
+Car2Black_avg@long_name=Car2Black@long_name;
+
+
 
 PRI570 = (R531 - R570) / (R531+R570);
 PRI570@long_name="Photochemical reflectance index (570)";
+PRI570_avg = (R531_avg - R570_avg) / (R531_avg+R570_avg);
+PRI570_avg@long_name=PRI570@long_name;
 
 
 SIPI =( R800 - R450) / (R800 + R650);
 SIPI@long_name="Structure intensive pigment index";
+SIPI_avg =( R800_avg - R450_avg) / (R800_avg + R650_avg);
+SIPI_avg@long_name=SIPI@long_name;
+
 
 
 antGamon=R650/R550;
 antGamon@long_name="Anthocyanin (Gamon)";
+antGamon_avg=R650_avg/R550_avg;
+antGamon_avg@long_name=antGamon@long_name;
+
+
 
 antGitelson=( 1.0f/R550 - 1.0f/R700)*R780;
 antGitelson@long_name="Anthocyanin (Gitelson)";
+antGitelson_avg=( 1.0f/R550_avg - 1.0f/R700_avg)*R780_avg;
+antGitelson_avg@long_name=antGitelson@long_name;
+
 
 CHLDela=( R540-R590 ) / ( R540 + R590);
 CHLDela@long_name="Chlorophyll content";
+CHLDela_avg=( R540_avg-R590_avg ) / ( R540_avg + R590_avg);
+CHLDela_avg@long_name=CHLDela@long_name;
+
+
 
 CI=( R750-R705 ) / ( R750 + R705);
 CI@long_name="Chlorophyll index";
+CI_avg=( R750_avg-R705_avg ) / ( R750_avg + R705_avg);
+CI_avg@long_name=CI@long_name;
+
+
 
 PRI586=( R531-R586) / ( R531 + R586);
 PRI586@long_name="Photochemical reflectance index (586)";
+PRI586_avg=( R531_avg-R586_avg) / ( R531_avg + R586_avg);
+PRI586_avg@long_name=PRI586@long_name;
+
+
 
 PRI512=( R531-R512) / ( R531 + R512);
 PRI512@long_name="Photochemical reflectance index (512)";
+PRI512_avg=( R531_avg-R512_avg) / ( R531_avg + R512_avg);
+PRI512_avg@long_name=PRI512@long_name;
+
 
 FRI1=R690 / R600;
 FRI1@long_name="Fluorescence ratio index1";
+FRI1_avg=R690_avg / R600_avg;
+FRI1_avg@long_name=FRI1@long_name;
+
+
 
 FRI2=R740 / R800;
 FRI2@long_name="Fluorescence ratio iindices 2";
+FRI2_avg=R740_avg / R800_avg;
+FRI2_avg@long_name=FRI2@long_name;
+
 
 NDVI1=(R800-R670)/ (R800+R670);
 NDVI1@long_name="Normalized Difference Vegetation Index1";
+NDVI1_avg=(R800_avg-R670_avg)/ (R800_avg+R670_avg);
+NDVI1_avg@long_name=NDVI1@long_name;
+
 
 RDVI=NDVI1*0.5f;
 RDVI@long_name="Renormalized Difference Vegetation Index";
+RDVI_avg=NDVI1_avg*0.5f;
+RDVI_avg@long_name=RDVI@long_name;
+
 
 RERI=R700/R670;
 RERI@long_name="Red edge ratio index";
+RERI_avg=R700_avg/R670_avg;
+RERI_avg@long_name=RERI@long_name;
+
+
 
 
 ZM= R750 / R710;
 ZM@long_name="Red edge";
+ZM_avg= R750_avg / R710_avg;
+ZM@long_name=ZM@long_name;
+
 
 REP=700.0f +40.0f*(((R670+R780)/2-R700) /(R740-R700));
 REP@long_name="Red edge position";
+REP_avg=700.0f +40.0f*(((R670_avg+R780_avg)/2-R700_avg) /(R740_avg-R700_avg));
+REP_avg@long_name=REP@long_name;
+
 
 NDRE=(R790-R720)/(R790+R720);
 NDRE@long_name="Normalized difference vegetation index";
+NDRE_avg=(R790_avg-R720_avg)/(R790_avg+R720_avg);
+NDRE_avg@long_name=NDRE@long_name;
 
 TVI=0.5f* (120.0f*(R750-R550)-200.0f*(R670-R550));
 TVI@long_name="Triangular Vegetation Index";
+TVI_avg=0.5f* (120.0f*(R750_avg-R550_avg)-200.0f*(R670_avg-R550_avg));
+TVI_avg@long_name=TVI@long_name;
