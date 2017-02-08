@@ -1,3 +1,5 @@
+DEBUG=0;
+
 iR445=min_coords(wavelength, 4.45e-7d);
 iR450=min_coords(wavelength, 4.5e-7d);
 iR470=min_coords(wavelength, 4.7e-7d);
@@ -34,97 +36,8 @@ iR900=min_coords(wavelength, 9e-7d);
 iR970=min_coords(wavelength, 9.7e-7d);
 
 
-
-R445=rfl_img(iR445,:,:);
-R445_avg=R445.avg();
-
-R450=rfl_img(iR450,:,:);
-R450_avg=R450.avg();
-
-R470=rfl_img(iR470,:,:);
-R470_avg=R470.avg();
-
-R500=rfl_img(iR500,:,:);
-R500_avg=R500.avg();
-
-R512=rfl_img(iR512,:,:);
-R512_avg=R512.avg();
-
-R531=rfl_img(iR531,:,:);
-R531_avg=R531.avg();
-
-R540=rfl_img(iR540,:,:);
-R540_avg=R540.avg();
-
-R550=rfl_img(iR550,:,:);
-R550_avg=R550.avg();
-
-R570=rfl_img(iR570,:,:);
-R570_avg=R570.avg();
-
-R586=rfl_img(iR586,:,:);
-R586_avg=R586.avg();
-
-R590=rfl_img(iR590,:,:);
-R590_avg=R590.avg();
-
-R600=rfl_img(iR600,:,:);
-R600_avg=R600.avg();
-
-R650=rfl_img(iR650,:,:);
-R650_avg=R650.avg();
-
-R670=rfl_img(iR670,:,:);
-R670_avg=R670.avg();
-
-R680=rfl_img(iR680,:,:);
-R680_avg=R680.avg();
-
-R690=rfl_img(iR690,:,:);
-R690_avg=R690.avg();
-
-R700=rfl_img(iR700,:,:);
-R700_avg=R700.avg();
-
-R705=rfl_img(iR705,:,:);
-R705_avg=R705.avg();
-
-R710=rfl_img(iR710,:,:);
-R710_avg=R710.avg();
-
-R720=rfl_img(iR720,:,:);
-R720_avg=R720.avg();
-
-R740=rfl_img(iR740,:,:);
-R740_avg=R740.avg();
-
-R750=rfl_img(iR750,:,:);
-R750_avg=R750.avg();
-
-R760=rfl_img(iR760,:,:);
-R760_avg=R760.avg();
-
-R780=rfl_img(iR780,:,:);
-R780_avg=R780.avg();
-
-R790=rfl_img(iR790,:,:);
-R790_avg=R790.avg();
-
-R800=rfl_img(iR800,:,:);
-R800_avg=R800.avg();
-
-R900=rfl_img(iR900,:,:);
-R900_avg=R900.avg();
-
-R970=rfl_img(iR970,:,:);
-R970_avg=R970.avg();
-
-
-
-
-
 // sanity check for wavelength coord  check min ,max, mode 
-if( fabs(wavelength(iR445)-4.45e-7) > 0.01e-7d )
+if( fabs(wavelength(iR445)-4.45e-7) > 0.01e-7d )  
   print("wavelength R445 not in wavelength coord\n");  
 
 if( fabs(wavelength(iR970)-9.70e-7) > 0.01e-7d )
@@ -132,6 +45,41 @@ if( fabs(wavelength(iR970)-9.70e-7) > 0.01e-7d )
 
 if( fabs(wavelength(iR700)-7e-7) > 0.01e-7d )
   print("wavelength R700 not in wavelength coord\");  
+
+
+
+
+
+{
+ 
+
+  @all=get_vars_out("iR*"s);
+  
+
+  if(DEBUG)
+    print(@all);
+
+  sz=@all.size();
+
+  for(idx=0; idx<sz ; idx++)
+  {
+    @var_inm=sprint(@all(idx));
+    /* remove "i" prefix" */
+    @var_nm=@var_inm(1:);
+ 
+    @var_nm_avg=push(@var_nm,"_avg");
+
+    /* create R* variables from hyperslab */
+    *@var_nm=rfl_img(*@var_inm,:,:);
+    /* create avg of hyperslabs */
+    *@var_nm_avg=*@var_nm.avg();
+  
+    if(DEBUG)
+       print(@var_nm,"%s\n");
+ 
+  }
+
+}
 
 
 NDVI = ( R900 -R680) / (R900+R680 );
