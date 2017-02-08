@@ -141,7 +141,10 @@ rfl_rfr_fct@units="1";
 // 20160826: Pre-assigning to zero would create additional copy and increase required memory
 // Instead use implicit casting, and overwrite attributes propagated from rfl_rfr_fct
 //rfl_img[wavelength,y,x]=0.0f;
-rfl_img=rfl_rfr_fct*(xps_img-xps_img_drk)/(xps_img_wht-xps_img_drk);
+//rfl_img=rfl_rfr_fct*(xps_img-xps_img_drk)/(xps_img_wht-xps_img_drk);
+// changed order of operations to reduce to two the number of expensive recasts 
+rfl_img= (rfl_rfr_fct/(xps_img_wht-xps_img_drk))*(xps_img-xps_img_drk);
+
 rfl_img@long_name="Reflectance of image";
 rfl_img@standard_name="surface_albedo";
 rfl_img@units="1";
