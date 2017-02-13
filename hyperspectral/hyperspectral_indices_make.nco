@@ -1,4 +1,4 @@
-DEBUG=0;
+DEBUG=1;
 
 iR445=min_coords(wavelength, 4.45e-7d);
 iR450=min_coords(wavelength, 4.5e-7d);
@@ -59,18 +59,25 @@ if( fabs(wavelength(iR700)-7e-7) > 0.01e-7d )
   if(DEBUG)
     print(@all);
 
-  sz=@all.size();
+  *sz=@all.size();
 
-  for(idx=0; idx<sz ; idx++)
+  for(*idx=0; idx<sz ; idx++)
   {
     @var_inm=sprint(@all(idx));
     /* remove "i" prefix" */
     @var_nm=@var_inm(1:);
- 
+    
     @var_nm_avg=push(@var_nm,"_avg");
 
     /* create R* variables from hyperslab */
     *@var_nm=rfl_img(*@var_inm,:,:);
+   
+    /* set and add missing value */   
+    where (*@var_nm <= 0.0f)
+      *@var_nm=1.0e36f;  
+
+    *@var_nm.set_miss(1.0e36f);  
+
     /* create avg of hyperslabs */
     *@var_nm_avg=*@var_nm.avg();
   
@@ -107,8 +114,7 @@ WI_avg=R900_avg-R970_avg;
 WI_avg@long_name=WI@long_name;
 
 
-
-CHL_avg=R750 / R550;
+CHL=R750 / R550;
 CHL@long_name="Chlorophyll index";
 CHL_avg=R750_avg / R550_avg;
 CHL_avg@long_name=CHL@long_name;
@@ -141,7 +147,7 @@ Car1Black_avg@long_name=Car1Black@long_name;
 
 Car2Black= ( R800 - R470 ) / (R800 + R470);
 Car2Black@long_name="Carotenoid index 2 (BlackBurn)";
-Car2Black= ( R800_avg - R470_avg ) / (R800_avg + R470_avg);
+Car2Black_avg= ( R800_avg - R470_avg ) / (R800_avg + R470_avg);
 Car2Black_avg@long_name=Car2Black@long_name;
 
 
@@ -249,7 +255,40 @@ NDRE@long_name="Normalized difference vegetation index";
 NDRE_avg=(R790_avg-R720_avg)/(R790_avg+R720_avg);
 NDRE_avg@long_name=NDRE@long_name;
 
-TVI=0.5f* (120.0f*(R750-R550)-200.0f*(R670-R550));
+TVI=pow( 0.5f, (120.0f*(R750-R550)-200.0f*(R670-R550)));
 TVI@long_name="Triangular Vegetation Index";
-TVI_avg=0.5f* (120.0f*(R750_avg-R550_avg)-200.0f*(R670_avg-R550_avg));
+TVI_avg=pow( 0.5f, (120.0f*(R750_avg-R550_avg)-200.0f*(R670_avg-R550_avg)));
 TVI_avg@long_name=TVI@long_name;
+
+
+// use vpointers to calculate averages AFTER pixel ratios
+
+@for_ratio={"NDVI"s,"SR"s, "OSAVI"s,"CHL"s,"msR705"s,"TCARI"s,"CarChap"s,"Car1Black"s,"Car2Black"s,"PRI570"s,"SIPI"s,"antGamon"s,"antGitelson"s,"CHLDela"s,"CI"s,"PRI586"s,"PRI512"s,"FRI1"s,"FRI2"s,"NDVI1"s,"RERI"s,"ZM"s,"REP"s,"NDRE"s,"TVI"s};
+
+
+//if(exists(DO_RBA) && DO_RBA>0)
+if(1)
+{ 
+  /* nb sz and idx are already RAM vars */
+
+  if(DEBUG)
+    print(@for_ratio);
+  
+  sz=@for_ratio.size();
+
+  mysz=sz;
+  print(mysz);    
+ 
+  for(idx=0;idx<sz;idx++)   
+  {
+    @rname=sprint(@for_ratio(idx));
+
+    if(exists(*@rname))
+    {
+    
+      /* ratio before average */
+      @rname_rba=push(@rname,"_rba"); 
+      *@rname_rba=*@rname.avg();
+   }  
+  }  
+}  
