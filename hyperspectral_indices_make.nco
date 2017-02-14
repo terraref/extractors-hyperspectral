@@ -1,90 +1,141 @@
-DEBUG=1;
+// -*-C++-*-
 
-iR445=min_coords(wavelength, 4.45e-7d);
-iR450=min_coords(wavelength, 4.5e-7d);
-iR470=min_coords(wavelength, 4.7e-7d);
+/* Purpose: NCO/ncap2 script to calculate hyperpectral indices from the hyperspectral reflectances 
+   ( this is the input variable rfl_img(wavelenth,y,x) ) 
+   by default the averages of the required reflectances is calculated. (these have the postfix suffix "_avg" )
+   These averages are then used to calculate the average of the indices. 
 
-iR500=min_coords(wavelength, 5.0e-7d);
-iR512=min_coords(wavelength, 5.120e-7d);
-iR531=min_coords(wavelength, 5.310e-7d);
-iR540=min_coords(wavelength, 5.40e-7d);
-iR550=min_coords(wavelength, 5.50e-7d);
-iR570=min_coords(wavelength, 5.7e-7d);
-iR586=min_coords(wavelength, 5.86e-7d);
-iR590=min_coords(wavelength, 5.9e-7d);
+   If requried the average  indices can be calculated after the ratio step. 
+   ( these  indices have the postfix suffix "_rba" )
+   Note the following indices are NOT ratio's ( "WI"  )
 
-iR600=min_coords(wavelength, 6e-7d);
-iR650=min_coords(wavelength, 6.5e-7d);
-iR670=min_coords(wavelength, 6.7e-7d);
-iR680=min_coords(wavelength, 6.8e-7d);
-iR690=min_coords(wavelength, 6.9e-7d);
+    
+   set the following flags on the ncap2 command line 
+   flg_dbg - if set then print debug info (default 0) 
+  
+   flg_rba - if set then calculate the averages after the ratio step (default 1)
+  
+   flg_mss - set the _FillValue 1.0e36 to all values in selected reflectances where value <=0.0f (default 1)
 
-iR700=min_coords(wavelength, 7.00e-7d);
-iR705=min_coords(wavelength, 7.05e-7d);
-iR710=min_coords(wavelength, 7.1e-7d);
-iR720=min_coords(wavelength, 7.2e-7d);
-iR740=min_coords(wavelength, 7.4e-7d);
-iR750=min_coords(wavelength, 7.5e-7d);
-iR760=min_coords(wavelength, 7.6e-7d);
-iR780=min_coords(wavelength, 7.8e-7d);
-iR790=min_coords(wavelength, 7.9e-7d);
+   usage examples 
+   ncap2 -v -O  -S hyperspectral_indices_make.nco   in.nc out.nc                                         ( use default flags)     
+   ncap2 -v -O -s 'flg_dbg=1s;flg_rba=0s;flg_mss=1s;' -S hyperspectral_indices_make.nco   in.nc out.nc   ( set flags )
 
 
-iR800=min_coords(wavelength, 8e-7d);
-
-iR900=min_coords(wavelength, 9e-7d);
-iR970=min_coords(wavelength, 9.7e-7d);
+*/
+   
 
 
-// sanity check for wavelength coord  check min ,max, mode 
+if(!exists(flg_dbg))
+   *flg_dbg=0s;  // [flg] Print debug info
+
+if(!exists(flg_rba))
+   *flg_rba=1s;  // [flg] calculate ratios before average
+
+if(!exists(flg_mss)){
+  *flg_mss=1s;  // [flg] add and set _FillValue to reflectance indices
+  flt_mss=1.0e36f;
+}
+
+
+
+
+//required reflectances
+@rfl_lst={"R445"s,"R450"s,"R470"s, "R500"s,"R512"s,"R531"s, "R540"s,"R550"s,"R570"s,"R586"s,"R590"s,"R600"s,"R650"s,"R670"s, "R680"s,"R690"s,"R700"s,"R705"s,"R710"s,"R720"s,"R740"s,"R750"s,"R760"s, "R780"s,"R790"s,"R800"s,"R900"s,"R970"s};  
+
+// nb ONE-TO_ONE  correspondence with above list
+@dbl_val_lst={ 4.45e-7d, 4.5e-7d, 4.7e-7d, 5.0e-7d, 5.12e-7, 5.31e-7, 5.4e-7, 5.5e-7, 5.7e-7,5.86e-7, 5.9e-7,6.0e-7,6.5e-7,6.7e-7, 6.8e-7, 6.9e-7, 7.0e-7, 7.05e-7, 7.1e-7,7.2e-7, 7.4e-7,7.5e-7,7.6e-7, 7.8e-7, 7.9e-7, 8.0e-7, 9.0e-7,9.7e-7};    
+
+// use vpointers to calculate averages AFTER pixel ratios
+@ind_lst={"NDVI"s,"SR"s, "OSAVI"s,"CHL"s,"msR705"s,"TCARI"s,"CarChap"s,"Car1Black"s,"Car2Black"s,"PRI570"s,"SIPI"s,"antGamon"s,"antGitelson"s,"CHLDela"s,"CI"s,"PRI586"s,"PRI512"s,"FRI1"s,"FRI2"s,"NDVI1"s,"RERI"s,"ZM"s,"REP"s,"NDRE"s,"TVI"s};
+
+
+
+/* sanity check */
+if( @rfl_lst.size() != @dbl_val_lst.size() )
+{
+  print("size difference between list @rfl_lst and @dbl_val_lst\n");
+  exit(1);
+}
+
+
+/* extract the required reflectances - 
+   nb min_coords() -extracts the index of the grid value nearest the required value 
+   This step creates the vars iR445, iR450, iR470..iR970 */
+{
+  *idx=0;
+  *sz=@rfl_lst.size();
+
+  for(idx=0;idx<sz;idx++)
+  {
+    @R_nm=sprint(@rfl_lst(idx));
+    @iR_nm=push("i",@R_nm);
+
+    *@iR_nm=min_coords(wavelength,@dbl_val_lst(idx));
+          
+  }
+
+
+}
+
+
+
+/* sanity checks for required relectances -  make sure the are within resonable tolerance (1.0e-9) */
 if( fabs(wavelength(iR445)-4.45e-7) > 0.01e-7d )  
+{
   print("wavelength R445 not in wavelength coord\n");  
-
+  exit(1);
+}
 if( fabs(wavelength(iR970)-9.70e-7) > 0.01e-7d )
+{
   print("wavelength R970 not in wavelength coord\n");  
-
+  exit(1);
+}
 if( fabs(wavelength(iR700)-7e-7) > 0.01e-7d )
-  print("wavelength R700 not in wavelength coord\");  
+{
+  print("wavelength R700 not in wavelength coord\n");  
+  exit(1);
+}
 
 
 
-
-
+/* This block hyperslabs the reflectances and their averages - with or with _FillValue */
+/* That is the vars R445, R450..R970  and  R445_avg, R450_avg..R970_avg */
 {
  
 
-  @all=get_vars_out("iR*"s);
-  
+  if(flg_dbg)
+    print(@rfl_lst);
 
-  if(DEBUG)
-    print(@all);
+  sz=@rfl_lst.size();
 
-  *sz=@all.size();
-
-  for(*idx=0; idx<sz ; idx++)
+  for(idx=0; idx<sz ; idx++)
   {
-    @var_inm=sprint(@all(idx));
-    /* remove "i" prefix" */
-    @var_nm=@var_inm(1:);
-    
+    @var_nm=sprint(@rfl_lst(idx));
+    @var_inm=push("i",@var_nm);   
     @var_nm_avg=push(@var_nm,"_avg");
 
     /* create R* variables from hyperslab */
     *@var_nm=rfl_img(*@var_inm,:,:);
    
-    /* set and add missing value */   
-    where (*@var_nm <= 0.0f)
-      *@var_nm=1.0e36f;  
 
-    *@var_nm.set_miss(1.0e36f);  
+    
+    /* set and add missing value */   
+   if(flg_mss) 
+   {
+    where (*@var_nm <= 0.0f)
+      *@var_nm=flt_mss;  
+
+    *@var_nm.set_miss(flt_mss);  
+   }
 
     /* create avg of hyperslabs */
     *@var_nm_avg=*@var_nm.avg();
   
-    if(DEBUG)
+    if(flg_dbg)
        print(@var_nm,"%s\n");
  
-  }
+  } 
 
 }
 
@@ -261,34 +312,28 @@ TVI_avg=pow( 0.5f, (120.0f*(R750_avg-R550_avg)-200.0f*(R670_avg-R550_avg)));
 TVI_avg@long_name=TVI@long_name;
 
 
-// use vpointers to calculate averages AFTER pixel ratios
 
-@for_ratio={"NDVI"s,"SR"s, "OSAVI"s,"CHL"s,"msR705"s,"TCARI"s,"CarChap"s,"Car1Black"s,"Car2Black"s,"PRI570"s,"SIPI"s,"antGamon"s,"antGitelson"s,"CHLDela"s,"CI"s,"PRI586"s,"PRI512"s,"FRI1"s,"FRI2"s,"NDVI1"s,"RERI"s,"ZM"s,"REP"s,"NDRE"s,"TVI"s};
-
-
-//if(exists(DO_RBA) && DO_RBA>0)
-if(1)
+/* if required then calculate _rba - averages after ratios */
+/* that is the vars NDVI_rba, SR_rba, OSAVI_rba..TVI_rba */
+if(flg_rba)
 { 
   /* nb sz and idx are already RAM vars */
 
-  if(DEBUG)
-    print(@for_ratio);
+  if(flg_dbg)
+    print(@ind_lst);
   
-  sz=@for_ratio.size();
+  sz=@ind_lst.size();
 
-  mysz=sz;
-  print(mysz);    
  
   for(idx=0;idx<sz;idx++)   
   {
-    @rname=sprint(@for_ratio(idx));
+     @rname=sprint(@ind_lst(idx));
 
-    if(exists(*@rname))
-    {
-    
-      /* ratio before average */
-      @rname_rba=push(@rname,"_rba"); 
-      *@rname_rba=*@rname.avg();
-   }  
+     if(exists(*@rname))
+     {
+        /* ratio before average */
+        @rname_rba=push(@rname,"_rba"); 
+        *@rname_rba=*@rname.avg();
+     }  
   }  
 }  
