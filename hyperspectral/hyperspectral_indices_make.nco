@@ -159,11 +159,11 @@ SR@long_name="Simple ratio";
 SR@standard_name="simple_ratio";
 SR@description="Simple ratio | R900 / R680 | Rouse et al. (1973)";
 SR@notes="Simple ratio | SR";
-NDVI@units="ratio";
-NDVI@min=SR.min();
-NDVI@max=SR.max();
-NDV@label="Reflectance Index";
-NDVI@type="trait";
+SR@units="ratio";
+SR@min=SR.min();
+SR@max=SR.max();
+SR@label="Reflectance Index";
+SR@type="trait";
 SR_avg=R900_avg / R680_avg;
 SR_avg@long_name=SR@long_name;
 
@@ -295,7 +295,6 @@ PRI570@min=PRI570.min();
 PRI570@max=PRI570.max();
 PRI570@label="Reflectance Index";
 PRI570@type="trait";
-
 PRI570_avg = (R531_avg - R570_avg) / (R531_avg+R570_avg);
 PRI570_avg@long_name=PRI570@long_name;
 
