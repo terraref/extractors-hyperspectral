@@ -109,7 +109,7 @@ def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption):
                                                           pointD=bounding_box[3])
 
         lat_final_result = np.array([x * LATITUDE_TO_METER for x in x_final_result])  + REFERENCE_POINT[0]
-        lon_final_result = np.array([y * LONGITUDE_TO_METER for y in y_final_result]) - REFERENCE_POINT[1]
+        lon_final_result = np.array([-y * LONGITUDE_TO_METER for y in y_final_result]) + REFERENCE_POINT[1]
 
         return {"x_coordinates": x_final_result,
                 "y_coordinates": y_final_result,

@@ -272,6 +272,8 @@ class DataContainer(object):
             lonNe = netCDFHandler.createVariable("lon_img_ne", "f8", fill_value=1e36)
             latNw = netCDFHandler.createVariable("lat_img_nw", "f8", fill_value=1e36)
             lonNw = netCDFHandler.createVariable("lon_img_nw", "f8", fill_value=1e36)
+            lats  = netCDFHandler.createVariable("lats", "f8", fill_value=1e36)
+            lons  = netCDFHandler.createVariable("lons", "f8", fill_value=1e36)
 
             netCDFHandler.close()
             return
