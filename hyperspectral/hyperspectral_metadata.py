@@ -262,7 +262,6 @@ class DataContainer(object):
 
         ### If failed to get the georeference values, pre_fill all the values with _FillValue=1e36 and close. ###
         if geo_data["x_coordinates"] is None:
-
             x = netCDFHandler.createVariable("x", "f8", fill_value=1e36)
             y = netCDFHandler.createVariable("y", "f8", fill_value=1e36)
             latSe = netCDFHandler.createVariable("lat_img_se", "f8", fill_value=1e36)
@@ -379,7 +378,20 @@ class DataContainer(object):
         yNw[...] = float(y[0])
         setattr(netCDFHandler.variables["y_img_nw"], "units", "meters")
         setattr(netCDFHandler.variables["y_img_nw"], "long_name", "Northwest corner of image, west distance to reference point")
-        
+
+        lats = netCDFHandler.createVariable("lats", "f8", ("x",))
+        lats[...] = geo_data["latitudes"]
+        setattr(netCDFHandler.variables["lats"], "units", "degrees")
+        setattr(netCDFHandler.variables["lats"], "long_name", "The precise latitude value for each pixel in the picture")
+        setattr(netCDFHandler.variables["lats"], "comment", "increasing toward the North direction, always positive")
+
+        lons = netCDFHandler.createVariable("lons", "f8", ("y",))
+        lats[...] = geo_data["longitudes"]
+        setattr(netCDFHandler.variables["lons"], "units", "degrees")
+        setattr(netCDFHandler.variables["lons"], "long_name", "The precise longitude value for each pixel in the picture")
+        setattr(netCDFHandler.variables["lats"], "comment", "decreasing toward the West direction, always negative")
+
+
         if format == "NETCDF3_CLASSIC":
             netCDFHandler.createDimension("length of Google Map String", len(geo_data["Google_Map"]))
             googleMapView = netCDFHandler.createVariable("Google_Map_View", "S1", ("length of Google Map String",))

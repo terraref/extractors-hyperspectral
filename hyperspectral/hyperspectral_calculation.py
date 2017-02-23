@@ -62,6 +62,8 @@ def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption):
         else: # We notice that there are cases that no position data available
             return {"x_coordinates": None,
                     "y_coordinates": None,
+                    "latitudes"    : None,
+                    "longitudes"   : None,
                     "bounding_box" : None,
                     "Google_Map"   : None}
 
@@ -106,7 +108,12 @@ def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption):
                                                           pointC=bounding_box[2],
                                                           pointD=bounding_box[3])
 
+        lat_final_result = np.array([x * LATITUDE_TO_METER for x in x_final_result])  + REFERENCE_POINT[0]
+        lon_final_result = np.array([y * LONGITUDE_TO_METER for y in y_final_result]) - REFERENCE_POINT[1]
+
         return {"x_coordinates": x_final_result,
                 "y_coordinates": y_final_result,
+                "latitudes"    : lat_final_result,
+                "longitudes"   : lon_final_result,
                 "bounding_box" : bounding_box,
                 "Google_Map"   : bounding_box_mapview}
