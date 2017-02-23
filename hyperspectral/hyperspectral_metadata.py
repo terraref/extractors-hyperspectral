@@ -381,17 +381,17 @@ class DataContainer(object):
         setattr(netCDFHandler.variables["y_img_nw"], "units", "meters")
         setattr(netCDFHandler.variables["y_img_nw"], "long_name", "Northwest corner of image, west distance to reference point")
 
-        lats = netCDFHandler.createVariable("lats", "f8", ("x",))
+        lats = netCDFHandler.createVariable("latitude", "f8", ("x",))
         lats[...] = geo_data["latitudes"]
-        setattr(netCDFHandler.variables["lats"], "units", "degrees")
-        setattr(netCDFHandler.variables["lats"], "long_name", "The precise latitude value for each pixel in the picture")
-        setattr(netCDFHandler.variables["lats"], "comment", "increasing toward the North direction, always positive")
+        setattr(netCDFHandler.variables["latitude"], "units", "degree")
+        setattr(netCDFHandler.variables["latitude"], "long_name", "The precise latitude value for each pixel in the picture")
+        setattr(netCDFHandler.variables["latitude"], "comment", "increasing toward the North direction, always positive")
 
-        lons = netCDFHandler.createVariable("lons", "f8", ("y",))
+        lons = netCDFHandler.createVariable("longitude", "f8", ("y",))
         lons[...] = geo_data["longitudes"]
-        setattr(netCDFHandler.variables["lons"], "units", "degrees")
-        setattr(netCDFHandler.variables["lons"], "long_name", "The precise longitude value for each pixel in the picture")
-        setattr(netCDFHandler.variables["lats"], "comment", "decreasing toward the West direction, always negative")
+        setattr(netCDFHandler.variables["longitude"], "units", "degree")
+        setattr(netCDFHandler.variables["longitude"], "long_name", "The precise longitude value for each pixel in the picture")
+        setattr(netCDFHandler.variables["longitude"], "comment", "decreasing toward the West direction, always negative")
 
 
         if format == "NETCDF3_CLASSIC":
