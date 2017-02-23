@@ -60,7 +60,10 @@ def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption):
             y_gantry_pos = float(master["gantry_system_variable_metadata"]["Position y [m]"])
 
         else: # We notice that there are cases that no position data available
-            return [0], [0], ["0, 0"]*4 , ""
+            return {"x_coordinates": None,
+                    "y_coordinates": None,
+                    "bounding_box" : None,
+                    "Google_Map"   : None}
 
         x_camera_pos = 1.9 # From https://github.com/terraref/reference-data/issues/32
         y_camera_pos = 0.855
@@ -97,10 +100,13 @@ def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption):
         NE = x_final_result[-1] * LONGITUDE_TO_METER + REFERENCE_POINT[0], y_final_result[0]  * LATITUDE_TO_METER + REFERENCE_POINT[1]
         NW = x_final_result[0] * LONGITUDE_TO_METER + REFERENCE_POINT[0] , y_final_result[0]  * LATITUDE_TO_METER + REFERENCE_POINT[1]
 
-        bounding_box = [str(SE).strip("()"), str(SW).strip("()"), str(NE).strip("()"), str(NW).strip("()")]
+        bounding_box = (str(SE).strip("()"), str(SW).strip("()"), str(NE).strip("()"), str(NW).strip("()"))
         bounding_box_mapview = GOOGLE_MAP_TEMPLATE.format(pointA=bounding_box[0],
                                                           pointB=bounding_box[1],
                                                           pointC=bounding_box[2],
                                                           pointD=bounding_box[3])
 
-        return x_final_result, y_final_result, bounding_box, bounding_box_mapview
+        return {"x_coordinates": x_final_result,
+                "y_coordinates": y_final_result,
+                "bounding_box" : bounding_box,
+                "Google_Map"   : bounding_box_mapview}

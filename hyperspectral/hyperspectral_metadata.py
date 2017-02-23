@@ -80,7 +80,7 @@ import json
 import time
 import os
 import re
-import struct
+import math
 from datetime import date, datetime
 from netCDF4 import Dataset, stringtochar
 from hyperspectral_calculation import pixel2Geographic, REFERENCE_POINT
@@ -108,6 +108,8 @@ _IS_DIGIT         = lambda fakeNum: set([member.isdigit() for member in fakeNum.
 _TIMESTAMP        = lambda: time.strftime("%a %b %d %H:%M:%S %Y",  time.localtime(int(time.time())))
 
 _WARN_MSG         = "{msg}"
+
+NCATTRS = {"_FillValue" : 1e36}
 
 
 class DataContainer(object):
@@ -200,25 +202,15 @@ class DataContainer(object):
 
         ########################### Adding geographic positions ###########################
 
-        xPixelsLocation, yPixelsLocation, boundingBox, googleMapAddress\
-         = pixel2Geographic("".join((inputFilePath[:-4],"_metadata.json")), "".join((inputFilePath,'.hdr')), camera_opt)
+        
+        geo_data = pixel2Geographic("".join((inputFilePath[:-4],"_metadata.json")), "".join((inputFilePath,'.hdr')), camera_opt)
 
         # Check if the image width and height are correctly collected.
-        assert len(xPixelsLocation) > 0 and len(yPixelsLocation) > 0, "ERROR: Failed to collect the image size metadata from " + "".join((inputFilePath,'.hdr')) + ". Please check the file."
-        
-        netCDFHandler.createDimension("x", len(xPixelsLocation))
-        x    = netCDFHandler.createVariable("x", "f8", ("x",))
-        x[...] = xPixelsLocation
-        setattr(netCDFHandler.variables["x"], "units", "meters")
-        setattr(netCDFHandler.variables['x'], 'reference_point', 'Southeast corner of field')
-        setattr(netCDFHandler.variables['x'], "long_name", "North-south offset from southeast corner of field")
+        # assert len(xPixelsLocation) > 0 and len(yPixelsLocation) > 0, "ERROR: Failed to collect the image size metadata from " + "".join((inputFilePath,'.hdr')) + ". Please check the file."
 
-        netCDFHandler.createDimension("y", len(yPixelsLocation))
-        y    = netCDFHandler.createVariable("y", "f8", ("y",))
-        y[...] = yPixelsLocation
-        setattr(netCDFHandler.variables["y"], "units", "meters")
-        setattr(netCDFHandler.variables['y'], 'reference_point', 'Southeast corner of field')
-        setattr(netCDFHandler.variables['y'], "long_name", "Distance west of the southeast corner of the field")
+        ###### The data below are fixed (i.e., they are the same for every output) ######
+
+        ### The latitute and longitude of the reference point in the field (SE corner) ###
 
         lat_pt, lon_pt = REFERENCE_POINT
 
@@ -234,6 +226,8 @@ class DataContainer(object):
         setattr(netCDFHandler.variables["lon_reference_point"], "long_name", "Longitude of the master reference point at southeast corner of field")
         setattr(netCDFHandler.variables["lon_reference_point"], "provenance", "https://github.com/terraref/reference-data/issues/32 by Dr. David LeBauer")
 
+        ### Reference point of the field in the coordinates, aka origin ###
+
         x_ref_pt = netCDFHandler.createVariable("x_reference_point", "f8")
         x_ref_pt[...] = 0
         setattr(netCDFHandler.variables["x_reference_point"], "units", "meters")
@@ -246,8 +240,59 @@ class DataContainer(object):
         setattr(netCDFHandler.variables["y_reference_point"], "long_name", "y of the master reference point at southeast corner of field")
         setattr(netCDFHandler.variables["y_reference_point"], "provenance", "https://github.com/terraref/reference-data/issues/32 by Dr. David LeBauer")
 
+        y_pxl_sz = netCDFHandler.createVariable("y_pxl_sz", "f8")
+        y_pxl_sz[...] = 0.98526434004512529576754637665e-3
+        setattr(netCDFHandler.variables["y_pxl_sz"], "units", "meters")
+        setattr(netCDFHandler.variables["y_pxl_sz"], "notes", "y coordinate length of a single pixel in pictures captured by SWIR and VNIR camera")
+
+        if camera_opt == "SWIR":
+            x_pxl_sz = netCDFHandler.createVariable("x_pxl_sz", "f8")
+            x_pxl_sz[...] = 1.025e-3
+            setattr(netCDFHandler.variables["x_pxl_sz"], "units", "meters")
+            setattr(netCDFHandler.variables["x_pxl_sz"], "notes", "x coordinate length of a single pixel in SWIR images")
+
+        else:
+            x_pxl_sz = netCDFHandler.createVariable("x_pxl_sz", "f8")
+            x_pxl_sz[...] = 1.930615052e-3
+            setattr(netCDFHandler.variables["x_pxl_sz"], "units", "meters")
+            setattr(netCDFHandler.variables["x_pxl_sz"], "notes", "x coordinate length of a single pixel in VNIR images")
+
+        ##### Write the history to netCDF #####
+        netCDFHandler.history = ''.join((_TIMESTAMP(), ': python ', commandLine))
+
+        ### If failed to get the georeference values, pre_fill all the values with _FillValue=1e36 and close. ###
+        if not geo_data["x_coordinates"]:
+
+            x = netCDFHandler.createVariable("x", "f8", fill_value=1e36)
+            y = netCDFHandler.createVariable("y", "f8", fill_value=1e36)
+            latSe = netCDFHandler.createVariable("lat_img_se", "f8", fill_value=1e36)
+            lonSe = netCDFHandler.createVariable("lon_img_se", "f8", fill_value=1e36)
+            latSw = netCDFHandler.createVariable("lat_img_sw", "f8", fill_value=1e36)
+            lonSw = netCDFHandler.createVariable("lon_img_sw", "f8", fill_value=1e36)
+            latNe = netCDFHandler.createVariable("lat_img_ne", "f8", fill_value=1e36)
+            lonNe = netCDFHandler.createVariable("lon_img_ne", "f8", fill_value=1e36)
+            latNw = netCDFHandler.createVariable("lat_img_nw", "f8", fill_value=1e36)
+            lonNw = netCDFHandler.createVariable("lon_img_nw", "f8", fill_value=1e36)
+
+            netCDFHandler.close()
+            return
+
+        netCDFHandler.createDimension("x", len(geo_data["x_coordinates"]))
+        x = netCDFHandler.createVariable("x", "f8", ("x",))
+        x[...] = geo_data["x_coordinates"]
+        setattr(netCDFHandler.variables["x"], "units", "meters")
+        setattr(netCDFHandler.variables['x'], 'reference_point', 'Southeast corner of field')
+        setattr(netCDFHandler.variables['x'], "long_name", "North-south offset from southeast corner of field")
+
+        netCDFHandler.createDimension("y", len(geo_data["y_coordinates"]))
+        y = netCDFHandler.createVariable("y", "f8", ("y",))
+        y[...] = geo_data["y_coordinates"]
+        setattr(netCDFHandler.variables["y"], "units", "meters")
+        setattr(netCDFHandler.variables['y'], 'reference_point', 'Southeast corner of field')
+        setattr(netCDFHandler.variables['y'], "long_name", "Distance west of the southeast corner of the field")
+
         # Write latitude and longitude of bounding box
-        SE, SW, NE, NW = boundingBox[0], boundingBox[1], boundingBox[2], boundingBox[3]
+        SE, SW, NE, NW = geo_data["bounding_box"]
         lat_se, lon_se = tuple(SE.split(", "))
         lat_sw, lon_sw = tuple(SW.split(", "))
         lat_ne, lon_ne = tuple(NE.split(", "))
@@ -336,37 +381,17 @@ class DataContainer(object):
         setattr(netCDFHandler.variables["y_img_nw"], "long_name", "Northwest corner of image, west distance to reference point")
         
         if format == "NETCDF3_CLASSIC":
-            netCDFHandler.createDimension("length of Google Map String", len(googleMapAddress))
+            netCDFHandler.createDimension("length of Google Map String", len(geo_data["Google_Map"]))
             googleMapView = netCDFHandler.createVariable("Google_Map_View", "S1", ("length of Google Map String",))
-            tempAddress = np.chararray((1, 1), itemsize=len(googleMapAddress))
-            tempAddress[:] = googleMapAddress
+            tempAddress = np.chararray((1, 1), itemsize=len(geo_data["Google_Map"]))
+            tempAddress[:] = geo_data["Google_Map"]
             googleMapView[...] = stringtochar(tempAddress)[0]
         else:
             googleMapView = netCDFHandler.createVariable("Google_Map_View", str)
-            googleMapView[...] = googleMapAddress
+            googleMapView[...] = geo_data["Google_Map"]
 
         setattr(netCDFHandler.variables["Google_Map_View"], "usage", "copy and paste to your web browser")
         setattr(netCDFHandler.variables["Google_Map_View"], 'reference_point', 'Southeast corner of field')
-
-        y_pxl_sz = netCDFHandler.createVariable("y_pxl_sz", "f8")
-        y_pxl_sz[...] = 0.98526434004512529576754637665e-3
-        setattr(netCDFHandler.variables["y_pxl_sz"], "units", "meters")
-        setattr(netCDFHandler.variables["y_pxl_sz"], "notes", "y coordinate length of a single pixel in pictures captured by SWIR and VNIR camera")
-
-        if camera_opt == "SWIR":
-            x_pxl_sz = netCDFHandler.createVariable("x_pxl_sz", "f8")
-            x_pxl_sz[...] = 1.025e-3
-            setattr(netCDFHandler.variables["x_pxl_sz"], "units", "meters")
-            setattr(netCDFHandler.variables["x_pxl_sz"], "notes", "x coordinate length of a single pixel in SWIR images")
-
-        else:
-            x_pxl_sz = netCDFHandler.createVariable("x_pxl_sz", "f8")
-            x_pxl_sz[...] = 1.930615052e-3
-            setattr(netCDFHandler.variables["x_pxl_sz"], "units", "meters")
-            setattr(netCDFHandler.variables["x_pxl_sz"], "notes", "x coordinate length of a single pixel in VNIR images")
-
-        ##### Write the history to netCDF #####
-        netCDFHandler.history = ''.join((_TIMESTAMP(), ': python ', commandLine))
 
         netCDFHandler.close()
 
