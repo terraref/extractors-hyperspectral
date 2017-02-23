@@ -386,7 +386,7 @@ class DataContainer(object):
         setattr(netCDFHandler.variables["lats"], "comment", "increasing toward the North direction, always positive")
 
         lons = netCDFHandler.createVariable("lons", "f8", ("y",))
-        lats[...] = geo_data["longitudes"]
+        lons[...] = geo_data["longitudes"]
         setattr(netCDFHandler.variables["lons"], "units", "degrees")
         setattr(netCDFHandler.variables["lons"], "long_name", "The precise longitude value for each pixel in the picture")
         setattr(netCDFHandler.variables["lats"], "comment", "decreasing toward the West direction, always negative")
