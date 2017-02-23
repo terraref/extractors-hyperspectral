@@ -261,7 +261,7 @@ class DataContainer(object):
         netCDFHandler.history = ''.join((_TIMESTAMP(), ': python ', commandLine))
 
         ### If failed to get the georeference values, pre_fill all the values with _FillValue=1e36 and close. ###
-        if not geo_data["x_coordinates"]:
+        if geo_data["x_coordinates"] is None:
 
             x = netCDFHandler.createVariable("x", "f8", fill_value=1e36)
             y = netCDFHandler.createVariable("y", "f8", fill_value=1e36)
