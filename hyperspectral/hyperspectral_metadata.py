@@ -262,18 +262,18 @@ class DataContainer(object):
 
         ### If failed to get the georeference values, pre_fill all the values with _FillValue=1e36 and close. ###
         if geo_data["x_coordinates"] is None:
-            x = netCDFHandler.createVariable("x", "f8", fill_value=1e36)
-            y = netCDFHandler.createVariable("y", "f8", fill_value=1e36)
-            latSe = netCDFHandler.createVariable("lat_img_se", "f8", fill_value=1e36)
-            lonSe = netCDFHandler.createVariable("lon_img_se", "f8", fill_value=1e36)
-            latSw = netCDFHandler.createVariable("lat_img_sw", "f8", fill_value=1e36)
-            lonSw = netCDFHandler.createVariable("lon_img_sw", "f8", fill_value=1e36)
-            latNe = netCDFHandler.createVariable("lat_img_ne", "f8", fill_value=1e36)
-            lonNe = netCDFHandler.createVariable("lon_img_ne", "f8", fill_value=1e36)
-            latNw = netCDFHandler.createVariable("lat_img_nw", "f8", fill_value=1e36)
-            lonNw = netCDFHandler.createVariable("lon_img_nw", "f8", fill_value=1e36)
-            lats  = netCDFHandler.createVariable("lats", "f8", fill_value=1e36)
-            lons  = netCDFHandler.createVariable("lons", "f8", fill_value=1e36)
+            x = netCDFHandler.createVariable("x", "f8", fill_value=NCATTRS["_FillValue"])
+            y = netCDFHandler.createVariable("y", "f8", fill_value=NCATTRS["_FillValue"])
+            latSe = netCDFHandler.createVariable("lat_img_se", "f8", fill_value=NCATTRS["_FillValue"])
+            lonSe = netCDFHandler.createVariable("lon_img_se", "f8", fill_value=NCATTRS["_FillValue"])
+            latSw = netCDFHandler.createVariable("lat_img_sw", "f8", fill_value=NCATTRS["_FillValue"])
+            lonSw = netCDFHandler.createVariable("lon_img_sw", "f8", fill_value=NCATTRS["_FillValue"])
+            latNe = netCDFHandler.createVariable("lat_img_ne", "f8", fill_value=NCATTRS["_FillValue"])
+            lonNe = netCDFHandler.createVariable("lon_img_ne", "f8", fill_value=NCATTRS["_FillValue"])
+            latNw = netCDFHandler.createVariable("lat_img_nw", "f8", fill_value=NCATTRS["_FillValue"])
+            lonNw = netCDFHandler.createVariable("lon_img_nw", "f8", fill_value=NCATTRS["_FillValue"])
+            lats  = netCDFHandler.createVariable("lats", "f8", fill_value=NCATTRS["_FillValue"])
+            lons  = netCDFHandler.createVariable("lons", "f8", fill_value=NCATTRS["_FillValue"])
 
             netCDFHandler.close()
             return
