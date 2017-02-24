@@ -216,13 +216,13 @@ class DataContainer(object):
 
         lat_pt_var = netCDFHandler.createVariable("lat_reference_point", "f8")
         lat_pt_var[...] = lat_pt
-        setattr(netCDFHandler.variables["lat_reference_point"], "units", "degrees_north")
+        setattr(netCDFHandler.variables["lat_reference_point"], "units", "degrees")
         setattr(netCDFHandler.variables["lat_reference_point"], "long_name", "Latitude of the master reference point at southeast corner of field")
         setattr(netCDFHandler.variables["lat_reference_point"], "provenance", "https://github.com/terraref/reference-data/issues/32 by Dr. David LeBauer")
 
         lon_pt_var = netCDFHandler.createVariable("lon_reference_point", "f8")
         lon_pt_var[...] = lon_pt
-        setattr(netCDFHandler.variables["lon_reference_point"], "units", "degrees_east")
+        setattr(netCDFHandler.variables["lon_reference_point"], "units", "degrees")
         setattr(netCDFHandler.variables["lon_reference_point"], "long_name", "Longitude of the master reference point at southeast corner of field")
         setattr(netCDFHandler.variables["lon_reference_point"], "provenance", "https://github.com/terraref/reference-data/issues/32 by Dr. David LeBauer")
 
