@@ -301,43 +301,43 @@ class DataContainer(object):
 
         latSe = netCDFHandler.createVariable("lat_img_se", "f8")
         latSe[...] = float(lat_se)
-        setattr(netCDFHandler.variables["lat_img_se"], "units", "degrees_north")
+        setattr(netCDFHandler.variables["lat_img_se"], "units", "degrees")
         setattr(netCDFHandler.variables["lat_img_se"], "long_name", "Latitude of southeast corner of image")
 
         # have a "x_y_img_se" in meters, double
         lonSe = netCDFHandler.createVariable("lon_img_se", "f8")
         lonSe[...] = float(lon_se)
-        setattr(netCDFHandler.variables["lon_img_se"], "units", "degrees_east")
+        setattr(netCDFHandler.variables["lon_img_se"], "units", "degrees")
         setattr(netCDFHandler.variables["lon_img_se"], "long_name", "Longitude of southeast corner of image")
 
         latSw = netCDFHandler.createVariable("lat_img_sw", "f8")
         latSw[...] = float(lat_sw)
-        setattr(netCDFHandler.variables["lat_img_sw"], "units", "degrees_north")
+        setattr(netCDFHandler.variables["lat_img_sw"], "units", "degrees")
         setattr(netCDFHandler.variables["lat_img_sw"], "long_name", "Latitude of southwest corner of image")
 
         lonSw = netCDFHandler.createVariable("lon_img_sw", "f8")
         lonSw[...] = float(lon_sw)
-        setattr(netCDFHandler.variables["lon_img_sw"], "units", "degrees_east")
+        setattr(netCDFHandler.variables["lon_img_sw"], "units", "degrees")
         setattr(netCDFHandler.variables["lon_img_sw"], "long_name", "Longitude of southwest corner of image")
 
         latNe = netCDFHandler.createVariable("lat_img_ne", "f8")
         latNe[...] = float(lat_ne)
-        setattr(netCDFHandler.variables["lat_img_ne"], "units", "degrees_north")
+        setattr(netCDFHandler.variables["lat_img_ne"], "units", "degrees")
         setattr(netCDFHandler.variables["lat_img_ne"], "long_name", "Latitude of northeast corner of image")
 
         lonNe = netCDFHandler.createVariable("lon_img_ne", "f8")
         lonNe[...] = float(lon_ne)
-        setattr(netCDFHandler.variables["lon_img_ne"], "units", "degrees_east")
+        setattr(netCDFHandler.variables["lon_img_ne"], "units", "degrees")
         setattr(netCDFHandler.variables["lon_img_ne"], "long_name", "Longitude of northeast corner of image")
 
         latNw = netCDFHandler.createVariable("lat_img_nw", "f8")
         latNw[...] = float(lat_nw)
-        setattr(netCDFHandler.variables["lat_img_nw"], "units", "degrees_north")
+        setattr(netCDFHandler.variables["lat_img_nw"], "units", "degrees")
         setattr(netCDFHandler.variables["lat_img_nw"], "long_name", "Latitude of northwest corner of image")
 
         lonNw = netCDFHandler.createVariable("lon_img_nw", "f8")
         lonNw[...] = float(lon_nw)
-        setattr(netCDFHandler.variables["lon_img_nw"], "units", "degrees_east")
+        setattr(netCDFHandler.variables["lon_img_nw"], "units", "degrees")
         setattr(netCDFHandler.variables["lon_img_nw"], "long_name", "Longitude of northwest corner of image")
 
         xSe = netCDFHandler.createVariable("x_img_se", "f8")
