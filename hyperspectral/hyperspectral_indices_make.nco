@@ -1,132 +1,241 @@
-DEBUG=1;
+// -*-C++-*-
 
-iR445=min_coords(wavelength, 4.45e-7d);
-iR450=min_coords(wavelength, 4.5e-7d);
-iR470=min_coords(wavelength, 4.7e-7d);
+/* Purpose: NCO/ncap2 script to calculate hyperpectral indices from the hyperspectral reflectances 
+   ( this is the input variable rfl_img(wavelenth,y,x) ) 
+   by default the averages of the required reflectances is calculated. (these have the postfix suffix "_avg" )
+   These averages are then used to calculate the average of the indices. 
 
-iR500=min_coords(wavelength, 5.0e-7d);
-iR512=min_coords(wavelength, 5.120e-7d);
-iR531=min_coords(wavelength, 5.310e-7d);
-iR540=min_coords(wavelength, 5.40e-7d);
-iR550=min_coords(wavelength, 5.50e-7d);
-iR570=min_coords(wavelength, 5.7e-7d);
-iR586=min_coords(wavelength, 5.86e-7d);
-iR590=min_coords(wavelength, 5.9e-7d);
+   If requried the average  indices can be calculated after the ratio step. 
+   ( these  indices have the postfix suffix "_rba" )
+   Note the following indices are NOT ratio's ( "WI"  )
 
-iR600=min_coords(wavelength, 6e-7d);
-iR650=min_coords(wavelength, 6.5e-7d);
-iR670=min_coords(wavelength, 6.7e-7d);
-iR680=min_coords(wavelength, 6.8e-7d);
-iR690=min_coords(wavelength, 6.9e-7d);
+    
+   set the following flags on the ncap2 command line 
+   flg_dbg - if set then print debug info (default 0) 
+  
+   flg_rba - if set then calculate the averages after the ratio step (default 1)
+  
+   flg_mss - set the _FillValue 1.0e36 to all values in selected reflectances where value <=0.0f (default 1)
 
-iR700=min_coords(wavelength, 7.00e-7d);
-iR705=min_coords(wavelength, 7.05e-7d);
-iR710=min_coords(wavelength, 7.1e-7d);
-iR720=min_coords(wavelength, 7.2e-7d);
-iR740=min_coords(wavelength, 7.4e-7d);
-iR750=min_coords(wavelength, 7.5e-7d);
-iR760=min_coords(wavelength, 7.6e-7d);
-iR780=min_coords(wavelength, 7.8e-7d);
-iR790=min_coords(wavelength, 7.9e-7d);
+   usage examples 
+   ncap2 -v -O  -S hyperspectral_indices_make.nco   in.nc out.nc                                         ( use default flags)     
+   ncap2 -v -O -s 'flg_dbg=1s;flg_rba=0s;flg_mss=1s;' -S hyperspectral_indices_make.nco   in.nc out.nc   ( set flags )
 
 
-iR800=min_coords(wavelength, 8e-7d);
-
-iR900=min_coords(wavelength, 9e-7d);
-iR970=min_coords(wavelength, 9.7e-7d);
+*/
+   
 
 
-// sanity check for wavelength coord  check min ,max, mode 
+if(!exists(flg_dbg))
+   *flg_dbg=0s;  // [flg] Print debug info
+
+if(!exists(flg_rba))
+   *flg_rba=1s;  // [flg] calculate ratios before average
+
+if(!exists(flg_mss)){
+  *flg_mss=1s;  // [flg] add and set _FillValue to reflectance indices
+  flt_mss=1.0e36f;
+}
+
+
+
+
+//required reflectances
+@rfl_lst={"R445"s,"R450"s,"R470"s, "R500"s,"R512"s,"R531"s, "R540"s,"R550"s,"R570"s,"R586"s,"R590"s,"R600"s,"R650"s,"R670"s, "R680"s,"R690"s,"R700"s,"R705"s,"R710"s,"R720"s,"R740"s,"R750"s,"R760"s, "R780"s,"R790"s,"R800"s,"R900"s,"R970"s};  
+
+// nb ONE-TO_ONE  correspondence with above list
+@dbl_val_lst={ 4.45e-7d, 4.5e-7d, 4.7e-7d, 5.0e-7d, 5.12e-7, 5.31e-7, 5.4e-7, 5.5e-7, 5.7e-7,5.86e-7, 5.9e-7,6.0e-7,6.5e-7,6.7e-7, 6.8e-7, 6.9e-7, 7.0e-7, 7.05e-7, 7.1e-7,7.2e-7, 7.4e-7,7.5e-7,7.6e-7, 7.8e-7, 7.9e-7, 8.0e-7, 9.0e-7,9.7e-7};    
+
+// use vpointers to calculate averages AFTER pixel ratios
+@ind_lst={"NDVI"s,"SR"s, "OSAVI"s,"CHL"s,"msR705"s,"TCARI"s,"CarChap"s,"Car1Black"s,"Car2Black"s,"PRI570"s,"SIPI"s,"antGamon"s,"antGitelson"s,"CHLDela"s,"CI"s,"PRI586"s,"PRI512"s,"FRI1"s,"FRI2"s,"NDVI1"s,"RERI"s,"ZM"s,"REP"s,"NDRE"s,"TVI"s};
+
+
+
+/* sanity check */
+if( @rfl_lst.size() != @dbl_val_lst.size() )
+{
+  print("size difference between list @rfl_lst and @dbl_val_lst\n");
+  exit(1);
+}
+
+
+/* extract the required reflectances - 
+   nb min_coords() -extracts the index of the grid value nearest the required value 
+   This step creates the vars iR445, iR450, iR470..iR970 */
+{
+  *idx=0;
+  *sz=@rfl_lst.size();
+
+  for(idx=0;idx<sz;idx++)
+  {
+    @R_nm=sprint(@rfl_lst(idx));
+    @iR_nm=push("i",@R_nm);
+
+    *@iR_nm=min_coords(wavelength,@dbl_val_lst(idx));
+          
+  }
+
+
+}
+
+
+
+/* sanity checks for required relectances -  make sure the are within resonable tolerance (1.0e-9) */
 if( fabs(wavelength(iR445)-4.45e-7) > 0.01e-7d )  
+{
   print("wavelength R445 not in wavelength coord\n");  
-
+  exit(1);
+}
 if( fabs(wavelength(iR970)-9.70e-7) > 0.01e-7d )
+{
   print("wavelength R970 not in wavelength coord\n");  
-
+  exit(1);
+}
 if( fabs(wavelength(iR700)-7e-7) > 0.01e-7d )
-  print("wavelength R700 not in wavelength coord\");  
+{
+  print("wavelength R700 not in wavelength coord\n");  
+  exit(1);
+}
 
 
 
-
-
+/* This block hyperslabs the reflectances and their averages - with or with _FillValue */
+/* That is the vars R445, R450..R970  and  R445_avg, R450_avg..R970_avg */
 {
  
 
-  @all=get_vars_out("iR*"s);
-  
+  if(flg_dbg)
+    print(@rfl_lst);
 
-  if(DEBUG)
-    print(@all);
+  sz=@rfl_lst.size();
 
-  *sz=@all.size();
-
-  for(*idx=0; idx<sz ; idx++)
+  for(idx=0; idx<sz ; idx++)
   {
-    @var_inm=sprint(@all(idx));
-    /* remove "i" prefix" */
-    @var_nm=@var_inm(1:);
-    
+    @var_nm=sprint(@rfl_lst(idx));
+    @var_inm=push("i",@var_nm);   
     @var_nm_avg=push(@var_nm,"_avg");
 
     /* create R* variables from hyperslab */
     *@var_nm=rfl_img(*@var_inm,:,:);
    
-    /* set and add missing value */   
-    where (*@var_nm <= 0.0f)
-      *@var_nm=1.0e36f;  
 
-    *@var_nm.set_miss(1.0e36f);  
+    
+    /* set and add missing value */   
+   if(flg_mss) 
+   {
+    where (*@var_nm <= 0.0f)
+      *@var_nm=flt_mss;  
+
+    *@var_nm.set_miss(flt_mss);  
+   }
 
     /* create avg of hyperslabs */
     *@var_nm_avg=*@var_nm.avg();
   
-    if(DEBUG)
+    if(flg_dbg)
        print(@var_nm,"%s\n");
  
-  }
+  } 
 
 }
 
 
 NDVI = ( R900 -R680) / (R900+R680 );
 NDVI@long_name="Normalized Difference Vegetation Index";
+NDVI@standard_name="normalized_difference_vegetation_index";
+NDVI@description="Normalized Difference Vegetation Index | (R900-R680)/(R900+R680) | Rouse et al. (1973)";
+NDVI@notes="Normalized Difference Vegetation Index | NDVI";
+NDVI@units="ratio";
+NDVI@min=NDVI.min();
+NDVI@max=NDVI.max();
+NDV@label="Reflectance Index";
+NDVI@type="trait";
 NDVI_avg = ( R900_avg -R680_avg) / (R900_avg+R680_avg );
 NDVI_avg@long_name=NDVI@long_name;
 
 
 SR=R900 / R680;
 SR@long_name="Simple ratio";
+SR@standard_name="simple_ratio";
+SR@description="Simple ratio | R900 / R680 | Rouse et al. (1973)";
+SR@notes="Simple ratio | SR";
+SR@units="ratio";
+SR@min=SR.min();
+SR@max=SR.max();
+SR@label="Reflectance Index";
+SR@type="trait";
 SR_avg=R900_avg / R680_avg;
 SR_avg@long_name=SR@long_name;
 
 
-
 OSAVI=1.16f*( (R800-R670) ) /  ( R800+R670+0.16f);
 OSAVI@long_name="Optimized Soil-Adjusted Vegetation index";
+OSAVI@standard_name="optimized_soil-adjusted_vegetation_index";
+OSAVI@description="Optimized Soil-Adjusted Vegetation index | 1.16f*( (R800-R670) ) /  ( R800+R670+0.16f) | Rondeaux et al. (1996)";
+OSAVI@notes="Optimized Soil-Adjusted Vegetation index | OSAVI";
+OSAVI@units="ratio";
+OSAVI@min=OSAVI.min();
+OSAVI@max=OSAVI.max();
+OSAVI@label="Reflectance Index";
+OSAVI@type="trait";
 OSAVI_avg=1.16f*( (R800_avg-R670_avg) ) /  ( R800_avg+R670_avg+0.16f);
 OSAVI_avg@long_name=OSAVI@long_name;
 
 
 WI=R900-R970;
 WI@long_name="water index";
+WI@standard_name="water_index";
+WI@description="water index | R900-R970 | Penuelas. et al. (1993)";
+WI@notes="water index | WI";
+WI@units="ratio";
+WI@min=WI.min();
+WI@max=WI.max();
+WI@label="Reflectance Index";
+WI@type="trait";
 WI_avg=R900_avg-R970_avg;
 WI_avg@long_name=WI@long_name;
 
 
 CHL=R750 / R550;
 CHL@long_name="Chlorophyll index";
+CHL@standard_name="chlorophyll_index";
+CHL@description="Chlorophyll index | R750 / R550 | Gitelson and Merzlyak (1994)";
+CHL@notes="Chlorophyll index | CHL";
+CHL@units="ratio";
+CHL@min=CHL.min();
+CHL@max=CHL.max();
+CHL@label="Reflectance Index";
+CHL@type="trait";
 CHL_avg=R750_avg / R550_avg;
 CHL_avg@long_name=CHL@long_name;
 
+
+
+
 msR705= (R750-R445) / (R705-R445);
 msR705@long_name="Modified simple ratio 705";
+msR705@standard_name="modified_simple_ratio_705";
+msR705@description="Modified simple ratio 705 | (R750-R445) / (R705-R445) | Sims and Gamon (2002)";
+msR705@notes="Modified simple ratio 705 | msR705";
+msR705@units="ratio";
+msR705@min=msR705.min();
+msR705@max=msR705.max();
+msR705@label="Reflectance Index";
+msR705@type="trait";
 msR705_avg= (R750_avg-R445_avg) / (R705_avg-R445_avg);
 msR705_avg@long_name=msR705@long_name;
 
 
 TCARI=3.0f*(  (R700-R670)-0.2f * (R700-R550) * (R700/R670)  );
 TCARI@long_name="Transformed chlorophyll absorption in reflectance index";
+TCARI@standard_name="transformed_chlorophyll_absorption_in_reflectance_index";
+TCARI@description="Transformed chlorophyll absorption in reflectance index | 3.0f*(  (R700-R670)-0.2f * (R700-R550) * (R700/R670)  ) | Haboudane et al. (2002)";
+TCARI@notes="Transformed chlorophyll absorption in reflectance index | TCARI";
+TCARI@units="ratio";
+TCARI@min=TCARI.min();
+TCARI@max=TCARI.max();
+TCARI@label="Reflectance Index";
+TCARI@type="trait";
 TCARI_avg=3.0f*(  (R700_avg-R670_avg)-0.2f * (R700_avg-R550_avg) * (R700_avg/R670_avg)  );
 TCARI_avg@long_name=TCARI@long_name;
 
@@ -134,12 +243,28 @@ TCARI_avg@long_name=TCARI@long_name;
 
 CarChap=R760/R500;
 CarChap@long_name="Carotenoid index (Chappelle)";
+CarChap@standard_name="carotenoid_index_(chappelle)";
+CarChap@description="Carotenoid index (Chappelle) | Ra760/R500 | Chappelle et al. (1992)";
+CarChap@notes="Carotenoid index (Chappelle) | CarChap";
+CarChap@min=CarChap.min();
+CarChap@max=CarChap.max();
+CarChap@label="Reflectance Index";
+CarChap@type="trait";
 CarChap_avg=R760_avg/R500_avg;
 CarChap_avg@long_name=CarChap@long_name;
 
 
 Car1Black=R800/R470;
 Car1Black@long_name="Carotenoid index (BlackBurn)";
+Car1Black@standard_name="carotenoid_index_(blackburn)";
+Car1Black@description="Carotenoid index (BlackBurn) | R800/R470 | Blackburn (1998)";
+Car1Black@notes="Carotenoid index (BlackBurn) | Car1Black";
+Car1Black@units="ratio";
+Car1Black@min=Car1Black.min();
+Car1Black@max=Car1Black.max();
+Car1Black@label="Reflectance Index";
+Car1Black@type="trait";
+
 Car1Black_avg=R800_avg/R470_avg;
 Car1Black_avg@long_name=Car1Black@long_name;
 
@@ -147,6 +272,14 @@ Car1Black_avg@long_name=Car1Black@long_name;
 
 Car2Black= ( R800 - R470 ) / (R800 + R470);
 Car2Black@long_name="Carotenoid index 2 (BlackBurn)";
+Car2Black@standard_name="carotenoid_index_2_(blackBurn)";
+Car2Black@description="Carotenoid index 2 (BlackBurn) | ( R800 - R470 ) / (R800 + R470) | Blackburn (1998)";
+Car2Black@notes="Carotenoid index 2 (BlackBurn) | Car2Black";
+Car2Black@units="ratio";
+Car2Black@min=Car2Black.min();
+Car2Black@max=Car2Black.max();
+Car2Black@label="Reflectance Index";
+Car2Black@type="trait";
 Car2Black_avg= ( R800_avg - R470_avg ) / (R800_avg + R470_avg);
 Car2Black_avg@long_name=Car2Black@long_name;
 
@@ -154,12 +287,28 @@ Car2Black_avg@long_name=Car2Black@long_name;
 
 PRI570 = (R531 - R570) / (R531+R570);
 PRI570@long_name="Photochemical reflectance index (570)";
+PRI570@standard_name="photochemical_reflectance_index_(570)";
+PRI570@description="Photochemical reflectance index (570) | (R531 - R570) / (R531+R570) | Gamon et al. (1992)";
+PRI570@notes="Photochemical reflectance index (570) | PRI570";
+PRI570@units="ratio";
+PRI570@min=PRI570.min();
+PRI570@max=PRI570.max();
+PRI570@label="Reflectance Index";
+PRI570@type="trait";
 PRI570_avg = (R531_avg - R570_avg) / (R531_avg+R570_avg);
 PRI570_avg@long_name=PRI570@long_name;
 
 
 SIPI =( R800 - R450) / (R800 + R650);
 SIPI@long_name="Structure intensive pigment index";
+SIPI@standard_name="structure_intensive_pigment_index";
+SIPI@description="Structure intensive pigment index | ( R800 - R450) / (R800 + R650) | Penuelas. et al. (1995)";
+SIPI@notes="Structure intensive pigment index | SIPI";
+SIPI@units="ratio";
+SIPI@min=SIPI.min();
+SIPI@max=SIPI.max();
+SIPI@label="Reflectance Index";
+SIPI@type="trait";
 SIPI_avg =( R800_avg - R450_avg) / (R800_avg + R650_avg);
 SIPI_avg@long_name=SIPI@long_name;
 
@@ -167,6 +316,15 @@ SIPI_avg@long_name=SIPI@long_name;
 
 antGamon=R650/R550;
 antGamon@long_name="Anthocyanin (Gamon)";
+antGamon@standard_name="anthocyanin_(gamon)";
+antGamon@description="Anthocyanin (Gamon) | R650/R550 | Gamon and Surfus (1999)";
+antGamon@notes="Anthocyanin (Gamon) | antGamon";
+antGamon@units="ratio";
+antGamon@min=antGamon.min();
+antGamon@max=antGamon.max();
+antGamon@label="Reflectance Index";
+antGamon@type="trait";
+
 antGamon_avg=R650_avg/R550_avg;
 antGamon_avg@long_name=antGamon@long_name;
 
@@ -174,12 +332,28 @@ antGamon_avg@long_name=antGamon@long_name;
 
 antGitelson=( 1.0f/R550 - 1.0f/R700)*R780;
 antGitelson@long_name="Anthocyanin (Gitelson)";
+antGitelson@standard_name="anthocyanin_(gitelson)";
+antGitelson@description="Anthocyanin (Gitelson) | ( 1.0f/R550 - 1.0f/R700)*R780 | Gitelson et al.(2003,2006)";
+antGitelson@notes="Anthocyanin (Gitelson) | antGitelson";
+antGitelson@units="ratio";
+antGitelson@min=antGitelson.min();
+antGitelson@max=antGitelson.max();
+antGitelson@label="Reflectance Index";
+antGitelson@type="trait";
 antGitelson_avg=( 1.0f/R550_avg - 1.0f/R700_avg)*R780_avg;
 antGitelson_avg@long_name=antGitelson@long_name;
 
 
 CHLDela=( R540-R590 ) / ( R540 + R590);
 CHLDela@long_name="Chlorophyll content";
+CHLDela@standard_name="chlorophyll_content";
+CHLDela@description="Chlorophyll content | ( R540-R590 ) / ( R540 + R590) | Delaieux et al. (2014)";
+CHLDela@notes="Chlorophyll content | CHLDela";
+CHLDela@units="ratio";
+CHLDela@min=CHLDela.min();
+CHLDela@max=CHLDela.max();
+CHLDela@label="Reflectance Index";
+CHLDela@type="trait";
 CHLDela_avg=( R540_avg-R590_avg ) / ( R540_avg + R590_avg);
 CHLDela_avg@long_name=CHLDela@long_name;
 
@@ -187,6 +361,14 @@ CHLDela_avg@long_name=CHLDela@long_name;
 
 CI=( R750-R705 ) / ( R750 + R705);
 CI@long_name="Chlorophyll index";
+CI@standard_name="chlorophyll_index";
+CI@description="Chlorophyll index | ( R750-R705 ) / ( R750 + R705) | Gitelson and Merzlyak (1994)";
+CI@notes="Chlorophyll index | CI";
+CI@units="ratio";
+CI@min=CI.min();
+CI@max=CI.max();
+CI@label="Reflectance Index";
+CI@type="trait";
 CI_avg=( R750_avg-R705_avg ) / ( R750_avg + R705_avg);
 CI_avg@long_name=CI@long_name;
 
@@ -194,6 +376,14 @@ CI_avg@long_name=CI@long_name;
 
 PRI586=( R531-R586) / ( R531 + R586);
 PRI586@long_name="Photochemical reflectance index (586)";
+PRI586@standard_name="photochemical_reflectance_index_(586)";
+PRI586@description="Photochemical reflectance index (586) | ( R531-R586) / ( R531 + R586) | Panigada et al. (2014)";
+PRI586@notes="Photochemical reflectance index (586) | PRI586";
+PRI586@units="ratio";
+PRI586@min=PRI586.min();
+PRI586@max=PRI586.max();
+PRI586@label="Reflectance Index";
+PRI586@type="trait";
 PRI586_avg=( R531_avg-R586_avg) / ( R531_avg + R586_avg);
 PRI586_avg@long_name=PRI586@long_name;
 
@@ -201,94 +391,165 @@ PRI586_avg@long_name=PRI586@long_name;
 
 PRI512=( R531-R512) / ( R531 + R512);
 PRI512@long_name="Photochemical reflectance index (512)";
+PRI512@standard_name="photochemical_reflectance_index_(512)";
+PRI512@description="Photochemical reflectance index (512) | ( R531-R512) / ( R531 + R512) | Hernández-Clemente et al. (2011)";
+PRI512@notes="Photochemical reflectance index (512) | PRI512";
+PRI512@units="ratio";
+PRI512@min=PRI512.min();
+PRI512@max=PRI512.max();
+PRI512@label="Reflectance Index";
+PRI512@type="trait";
 PRI512_avg=( R531_avg-R512_avg) / ( R531_avg + R512_avg);
 PRI512_avg@long_name=PRI512@long_name;
 
 
 FRI1=R690 / R600;
 FRI1@long_name="Fluorescence ratio index1";
+FRI1@standard_name="fluorescence_ratio_index1";
+FRI1@description="Fluorescence ratio index1 | R690 / R600 | Dobrowski et al. (2005)";
+FRI1@notes="Fluorescence ratio index1 | FRI1";
+FRI1@units="ratio";
+FRI1@min=FRI1.min();
+FRI1@max=FRI1.max();
+FRI1@label="Reflectance Index";
+FRI1@type="trait";
 FRI1_avg=R690_avg / R600_avg;
 FRI1_avg@long_name=FRI1@long_name;
 
 
 
 FRI2=R740 / R800;
-FRI2@long_name="Fluorescence ratio iindices 2";
+FRI2@long_name="Fluorescence ratio indices 2";
+FRI2@standard_name="fluorescence_ratio_indices_2";
+FRI2@description="Fluorescence ratio indices 2 | R740 / R800 | Dobrowski et al. (2005)";
+FRI2@notes="Fluorescence ratio indices 2 | FRI2";
+FRI2@units="ratio";
+FRI2@min=FRI2.min();
+FRI2@max=FRI2.max();
+FRI2@label="Reflectance Index";
+FRI2@type="trait";
 FRI2_avg=R740_avg / R800_avg;
 FRI2_avg@long_name=FRI2@long_name;
 
 
 NDVI1=(R800-R670)/ (R800+R670);
 NDVI1@long_name="Normalized Difference Vegetation Index1";
+NDVI1@standard_name="normalized_difference_vegetation_index1";
+NDVI1@description="Normalized Difference Vegetation Index1 | (R800-R670)/ (R800+R670) | Rouse et al. (1973)";
+NDVI1@notes="Normalized Difference Vegetation Index1 | NDVI1";
+NDVI1@units="ratio";
+NDVI1@min=NDVI1.min();
+NDVI1@max=NDVI1.max();
+NDVI1@label="Reflectance Index";
+NDVI1@type="trait";
 NDVI1_avg=(R800_avg-R670_avg)/ (R800_avg+R670_avg);
 NDVI1_avg@long_name=NDVI1@long_name;
 
 
 RDVI=NDVI1*0.5f;
 RDVI@long_name="Renormalized Difference Vegetation Index";
+RDVI@standard_name="renormalized_difference_vegetation_index";
+RDVI@description="Renormalized Difference Vegetation Index | NDVI1*0.5f | Rougean and Breon (1995)";
+RDVI@notes="Renormalized Difference Vegetation Index | RDVI";
+RDVI@units="ratio";
+RDVI@min=RDVI.min();
+RDVI@max=RDVI.max();
+RDVI@label="Reflectance Index";
+RDVI@type="trait";
 RDVI_avg=NDVI1_avg*0.5f;
 RDVI_avg@long_name=RDVI@long_name;
 
 
 RERI=R700/R670;
 RERI@long_name="Red edge ratio index";
+RERI@standard_name="red_edge_ratio_index";
+RERI@description="Red edge ratio index | R700/R670 | Part of TCARI index";
+RERI@notes="Red edge ratio index | RERI";
+RERI@units="ratio";
+RERI@min=RERI.min();
+RERI@max=RERI.max();
+RERI@label="Reflectance Index";
+RERI@type="trait";
 RERI_avg=R700_avg/R670_avg;
 RERI_avg@long_name=RERI@long_name;
 
 
-
-
 ZM= R750 / R710;
 ZM@long_name="Red edge";
+ZM@standard_name="red_edge";
+ZM@description="Red edge | R750 / R710 | Zarco-Tejada et al. (2001)";
+ZM@notes="Red edge | ZM";
+ZM@units="ratio";
+ZM@min=ZM.min();
+ZM@max=ZM.max();
+ZM@label="Reflectance Index";
+ZM@type="trait";
 ZM_avg= R750_avg / R710_avg;
 ZM@long_name=ZM@long_name;
 
 
 REP=700.0f +40.0f*(((R670+R780)/2-R700) /(R740-R700));
 REP@long_name="Red edge position";
+REP@standard_name="red_edge_position";
+REP@description="Red edge position | 700.0f +40.0f*(((R670+R780)/2-R700) /(R740-R700)) | Guyot and Baret, 1988";
+REP@notes="Red edge position | REP";
+REP@units="ratio";
+REP@min=REP.min();
+REP@max=REP.max();
+REP@label="Reflectance Index";
+REP@type="trait";
 REP_avg=700.0f +40.0f*(((R670_avg+R780_avg)/2-R700_avg) /(R740_avg-R700_avg));
 REP_avg@long_name=REP@long_name;
 
 
 NDRE=(R790-R720)/(R790+R720);
 NDRE@long_name="Normalized difference vegetation index";
+NDRE@standard_name="normalized_difference_vegetation_index";
+NDRE@description="Normalized difference vegetation index | (R790-R720)/(R790+R720) | Barnes et al. (2000)";
+NDRE@notes="Normalized difference vegetation index | NDRE";
+NDRE@units="ratio";
+NDRE@min=NDRE.min();
+NDRE@max=NDRE.max();
+NDRE@label="Reflectance Index";
+NDRE@type="trait";
 NDRE_avg=(R790_avg-R720_avg)/(R790_avg+R720_avg);
 NDRE_avg@long_name=NDRE@long_name;
 
 TVI=pow( 0.5f, (120.0f*(R750-R550)-200.0f*(R670-R550)));
 TVI@long_name="Triangular Vegetation Index";
+TVI@standard_name="triangular_vegetation_index";
+TVI@description="Triangular Vegetation Index | 0.5f**(120.0f*(R750-R550)-200.0f*(R670-R550))) | Haboudaneet al. (2004)";
+TVI@notes="Triangular Vegetation Index | TVI";
+TVI@units="ratio";
+TVI@min=TVI.min();
+TVI@max=TVI.max();
+TVI@label="Reflectance Index";
+TVI@type="trait";
 TVI_avg=pow( 0.5f, (120.0f*(R750_avg-R550_avg)-200.0f*(R670_avg-R550_avg)));
 TVI_avg@long_name=TVI@long_name;
 
 
-// use vpointers to calculate averages AFTER pixel ratios
-
-@for_ratio={"NDVI"s,"SR"s, "OSAVI"s,"CHL"s,"msR705"s,"TCARI"s,"CarChap"s,"Car1Black"s,"Car2Black"s,"PRI570"s,"SIPI"s,"antGamon"s,"antGitelson"s,"CHLDela"s,"CI"s,"PRI586"s,"PRI512"s,"FRI1"s,"FRI2"s,"NDVI1"s,"RERI"s,"ZM"s,"REP"s,"NDRE"s,"TVI"s};
-
-
-//if(exists(DO_RBA) && DO_RBA>0)
-if(1)
+/* if required then calculate _rba - averages after ratios */
+/* that is the vars NDVI_rba, SR_rba, OSAVI_rba..TVI_rba */
+if(flg_rba)
 { 
   /* nb sz and idx are already RAM vars */
 
-  if(DEBUG)
-    print(@for_ratio);
+  if(flg_dbg)
+    print(@ind_lst);
   
-  sz=@for_ratio.size();
+  sz=@ind_lst.size();
 
-  mysz=sz;
-  print(mysz);    
  
   for(idx=0;idx<sz;idx++)   
   {
-    @rname=sprint(@for_ratio(idx));
+     @rname=sprint(@ind_lst(idx));
 
-    if(exists(*@rname))
-    {
-    
-      /* ratio before average */
-      @rname_rba=push(@rname,"_rba"); 
-      *@rname_rba=*@rname.avg();
-   }  
+     if(exists(*@rname))
+     {
+        /* ratio before average */
+        @rname_rba=push(@rname,"_rba"); 
+        *@rname_rba=*@rname.avg();
+     }  
   }  
 }  
