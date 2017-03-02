@@ -19,18 +19,24 @@ python hyperspectral_file_finder.py <"month/date/year hour:minute:second"> <root
 # Make sure that you quote the time parameter.
 '''
 
-def date_parser(date_object):
+def date_parser(date_object, time_shift_unit, time_shift):
     current_time = date_object
-    next_hour    = date_object + timedelta(hours=1)
+    if time_shift_unit == "hours":
+        next_period = date_object + timedelta(hours=time_shift)
+    elif time_shift_unit == "minutes":
+        next_period = date_object + timedelta(minutes=time_shift)
 
     return {"current_time_year" : str(current_time.year),
             "current_time_month": format(current_time.month, "02"),
             "current_time_day"  : format(current_time.day, "02"),
             "current_time_hour" : format(current_time.hour,"02"),
-            "next_hour_year"    : str(next_hour.year),
-            "next_hour_month"   : format(next_hour.month, "02"),
-            "next_hour_day"     : format(next_hour.day, "02"),
-            "next_hour_hour"    : format(next_hour.hour,"02")}
+            "next_period_year"  : str(next_period.year),
+            "next_period_month" : format(next_period.month, "02"),
+            "next_period_day"   : format(next_period.day, "02"),
+            "next_period_hour"  : format(next_period.hour,"02")}
+
+
+def analyze_time_interval(target, date_a, date_b):
 
 def file_finder(date, file_path):
     '''
@@ -39,16 +45,20 @@ def file_finder(date, file_path):
     if not os.path.exists(file_path):
         raise OSError("The path is invalid")
 
-    date_list = date_parser(datetime.strptime(date, "%m/%d/%Y %H:%M:%S"))
-    current_date_directory     = "-".join((date_list["current_time_year"], date_list["current_time_month"], date_list["current_time_day"]))
+    date_object = datetime.strptime(date, "%m/%d/%Y %H:%M:%S")
+    current_date_directory = "-".join((str(date_object.year), format(date_object.month, "02"), format(current_time.day, "02")))
+
+    if len(os.listdir(os.path.join(file_path, current_date_directory))) > 24:
+        date_list = date_parser(date_object,"minute",2)
+    current_date_directory = "-".join((date_list["current_time_year"], date_list["current_time_month"], date_list["current_time_day"]))
     for files in os.listdir(os.path.join(file_path, current_date_directory)):
         if files.startswith(current_date_directory+"_"+date_list["current_time_hour"]): #[0][-29:]
             print os.path.join(file_path, current_date_directory, files)
             break
 
-    next_date_directory = "-".join((date_list["next_hour_year"], date_list["next_hour_month"], date_list["next_hour_day"]))
+    next_date_directory = "-".join((date_list["next_period_year"], date_list["next_period_month"], date_list["next_period_day"]))
     for files in os.listdir(os.path.join(file_path, next_date_directory)):
-        if files.startswith(next_date_directory+"_"+date_list["next_hour_hour"]): #[0][-29:]
+        if files.startswith(next_date_directory+"_"+date_list["next_period_hour"]): #[0][-29:]
             print os.path.join(file_path, next_date_directory, files)
             break
 
