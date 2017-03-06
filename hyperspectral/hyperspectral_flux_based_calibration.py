@@ -9,15 +9,18 @@ from datetime import date, datetime, timedelta
 from netCDF4 import Dataset
 
 '''
+Testing Commands:
+Jerome: python hyperspectral_flux_based_calibration.py "10/15/2016 18:37:44" .
+ROGER : python hyperspectral_flux_based_calibration.py "10/15/2016 18:37:44" /home/jiarunm/extractors-hyperspectral/hyperspectral/test/
+(the test file is in my account, but I had already set permission to everyone)
+Generally the commands look like:
+python hyperspectral_flux_based_calibration.py <"month/date/year hour:minute:second"> <root directory of the environmental logger>
+
 The date should be in format
 month/date/year hour:minute:second (to be compatible with the metadata in the hyperspectral workflow)
 The path to the nearest two environmental logger records (can be JSON or netCDF file) will be printed out to the STDOUT
 
-Sample Command-line (on ROGER):
-python hyperspectral_flux_based_calibration.py "09/22/2016 13:53:44" /projects/arpae/terraref/sites/ua-mac/raw_data/EnvironmentLogger
-
-Generally the commands look like:
-python hyperspectral_flux_based_calibration.py <"month/date/year hour:minute:second"> <root directory of the environmental logger>
+The script will generate a new output netCDF file with weighted average downwelling flux and wavelengths.
 
 # Make sure that you quote the time parameter.
 
@@ -107,7 +110,6 @@ def file_locator(date, file_path):
 
     if date > date_cutpoint:
 
-        temp_file_header = "-".join((str(date.year), format(date.month, "02"), format(date.day, "02"))) + str(date.hour)
         directory = sorted(os.listdir(current_date_directory), key=lambda x: datetime.strptime(x[:19], "%Y-%m-%d_%H-%M-%S"))
         file_time_list = [datetime.strptime(files[:19], "%Y-%m-%d_%H-%M-%S") for files in directory]
 
