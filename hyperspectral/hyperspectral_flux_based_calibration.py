@@ -74,9 +74,9 @@ def downwelling_irradiance_extractor(netCDF_handles, target_time):
             bisect.insort_left(environmental_time_axis, numerical_time)
             nearest_indices = environmental_time_axis.index(numerical_time) # right time point
 
-            return netCDF_handler.variables["times"][nearest_indices],
-                   netCDF_handler.variables["times"][nearest_indices-1],
-                   netCDF_handler.variables["flx_spc_dwn"][nearest_indices], 
+            return netCDF_handler.variables["times"][nearest_indices],\
+                   netCDF_handler.variables["times"][nearest_indices-1],\
+                   netCDF_handler.variables["flx_spc_dwn"][nearest_indices],\ 
                    netCDF_handler.variables["flx_spc_dwn"][nearest_indices-1]
     else:
         with Dataset(netCDF_handles[0], "r", format='NETCDF4') as netCDF_handler_a, 
