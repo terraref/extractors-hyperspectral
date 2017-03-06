@@ -34,7 +34,7 @@ def solar_zenith_angle(datetime_object):
 
 def weighted_avg_calculator(target_time, time_a, time_b, flx_a, flx_b):
     '''
-    Calculate the weight for the two environmental loggers around the hyperspectral time point
+    Calculate the weighted average for the two environmental loggers around the hyperspectral time point
     '''
     target_time_absolute = translate_time(target_time)
 
@@ -65,18 +65,12 @@ def downwelling_irradiance_extractor(netCDF_handles, target_time):
     Extract the downwelling_irradiance_spectrum for the certain time points in a netCDF file.
     '''
     if len(netCDF_handles) == 1:
-        print netCDF_handles[0]
         with Dataset(netCDF_handles[0], "r", format='NETCDF4') as netCDF_handler:
             numerical_time = translate_time(target_time)
+            nearest_indices = bisect.bisect_left(netCDF_handler.variables["time"], numerical_time) # right time point
 
-            environmental_time_axis    = list()
-            environmental_time_axis[:] = netCDF_handler.variables["time"]
-
-            bisect.insort_left(environmental_time_axis, numerical_time)
-            nearest_indices = environmental_time_axis.index(numerical_time) # right time point
-
-            return netCDF_handler.variables["times"][nearest_indices],\
-                   netCDF_handler.variables["times"][nearest_indices-1],\
+            return netCDF_handler.variables["time"][nearest_indices],\
+                   netCDF_handler.variables["time"][nearest_indices-1],\
                    netCDF_handler.variables["flx_spc_dwn"][nearest_indices],\
                    netCDF_handler.variables["flx_spc_dwn"][nearest_indices-1]
     else:
@@ -85,22 +79,16 @@ def downwelling_irradiance_extractor(netCDF_handles, target_time):
 
             return netCDF_handler_a.variables["flx_spc_dwn"][-1], netCDF_handler_b.variables["flx_spc_dwn"][0]
 
+def wavelength_extractor(netCDF_handles):
+    '''
+    Extract the wavelengths from the environmental loggers
+    '''
+    if len(netCDF_handles) == 1:
+        with Dataset(netCDF_handles[0], "r", format='NETCDF4') as netCDF_handler:
+            wavelength_list = list()
+            wavelength_list[:] = netCDF_handler.variables["wvl_lgr"] # Strange, but we cannot return a variable after the dataset was closed
 
-# def date_parser(date_object, time_shift_unit, time_shift):
-#     current_time = date_object
-#     if time_shift_unit == "hours":
-#         next_period = date_object + timedelta(hours=time_shift)
-#     elif time_shift_unit == "minutes":
-#         next_period = date_object + timedelta(minutes=time_shift)
-
-#     return {"current_time_year" : str(current_time.year),
-#             "current_time_month": format(current_time.month, "02"),
-#             "current_time_day"  : format(current_time.day, "02"),
-#             "current_time_hour" : format(current_time.hour,"02"),
-#             "next_period_year"  : str(next_period.year),
-#             "next_period_month" : format(next_period.month, "02"),
-#             "next_period_day"   : format(next_period.day, "02"),
-#             "next_period_hour"  : format(next_period.hour,"02")}
+            return wavelength_list
 
 
 def file_locator(date, file_path):
@@ -126,20 +114,28 @@ def file_locator(date, file_path):
         intended_file_location = bisect.bisect_left(file_time_list, date)
 
         if intended_file_location > 0:
-            return [directory[intended_file_location-1]]
+            return [os.path.join(current_date_directory, directory[intended_file_location-1])]
 
 
 def main(date_string, EL_root_directory):
     date_object = datetime.strptime(date_string, "%m/%d/%Y %H:%M:%S") # parse the time
     file_list   = file_locator(date_object, EL_root_directory) # locate the file
 
-    data = downwelling_irradiance_extractor(file_list, date_object) # extarct the downwelling irradiance data
+    flx_spc_dwn = downwelling_irradiance_extractor(file_list, date_object) # extarct the downwelling irradiance data
+    wavelength  = wavelength_extractor(file_list)
 
     ########## Write into the output file ##########
-    with Dataset("calibration_el_realtime_"+date_string,"w",format="NETCDF4") as output_handle:
-        output_handle.createDimension("wvl", len(data))
-        output_handle.createVariable("weighted_average_downwelling_irradiance", ("wvl",))
-        output_handle[:] = weighted_avg_calculator(date_object, *data)
+    with Dataset("calibration_el_realtime.nc","w",format="NETCDF4") as output_handle:
+        output_handle.createDimension("wvl", len(wavelength))
+        output_handle.createVariable("weighted_average_downwelling_irradiance", "f8", ("wvl",))
+        output_handle.createVariable("wvl_lgr", "f8", ("wvl",))
+        result = weighted_avg_calculator(date_object, *flx_spc_dwn)
+
+        output_handle.variables["wvl_lgr"][:] = wavelength
+        output_handle.variables["weighted_average_downwelling_irradiance"][:] = result
+
+        setattr(output_handle.variables["weighted_average_downwelling_irradiance"], "units", "watt meter-2 meter-1")
+        setattr(output_handle.variables["wvl_lgr"], "units", "meter")
 
 if __name__ == "__main__":
     main(sys.argv[1], sys.argv[2])
