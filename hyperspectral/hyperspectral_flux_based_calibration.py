@@ -79,7 +79,7 @@ def downwelling_irradiance_extractor(netCDF_handles, target_time):
                    netCDF_handler.variables["flx_spc_dwn"][nearest_indices],\
                    netCDF_handler.variables["flx_spc_dwn"][nearest_indices-1]
     else:
-        with Dataset(netCDF_handles[0], "r", format='NETCDF4') as netCDF_handler_a, 
+        with Dataset(netCDF_handles[0], "r", format='NETCDF4') as netCDF_handler_a,\
              Dataset(netCDF_handles[1], "r", format='NETCDF4') as netCDF_handler_b:
 
             return netCDF_handler_a.variables["flx_spc_dwn"][-1], netCDF_handler_b.variables["flx_spc_dwn"][0]
