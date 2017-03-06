@@ -126,8 +126,10 @@ def main(date_string, EL_root_directory):
     flx_spc_dwn = downwelling_irradiance_extractor(file_list, date_object) # extarct the downwelling irradiance data
     wavelength  = wavelength_extractor(file_list)
 
+    output_data_name = "calibration_el_realtime_"+date_string.replace("/","_").replace(" ", "_")+".nc"
+    
     ########## Write into the output file ##########
-    with Dataset("calibration_el_realtime.nc","w",format="NETCDF4") as output_handle:
+    with Dataset(output_data_name,"w",format="NETCDF4") as output_handle:
         output_handle.createDimension("wvl", len(wavelength))
         output_handle.createVariable("weighted_average_downwelling_irradiance", "f8", ("wvl",))
         output_handle.createVariable("wvl_lgr", "f8", ("wvl",))
