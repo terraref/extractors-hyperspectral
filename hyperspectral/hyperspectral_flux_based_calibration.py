@@ -65,6 +65,7 @@ def downwelling_irradiance_extractor(netCDF_handles, target_time):
     Extract the downwelling_irradiance_spectrum for the certain time points in a netCDF file.
     '''
     if len(netCDF_handles) == 1:
+        print netCDF_handles[0]
         with Dataset(netCDF_handles[0], "r", format='NETCDF4') as netCDF_handler:
             numerical_time = translate_time(target_time)
 
