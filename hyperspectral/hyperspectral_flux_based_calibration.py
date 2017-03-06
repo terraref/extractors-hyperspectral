@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python -O
 
 import os
 import sys
@@ -108,7 +108,7 @@ def file_locator(date, file_path):
     if date > date_cutpoint:
 
         temp_file_header = "-".join((str(date.year), format(date.month, "02"), format(date.day, "02"))) + str(date.hour)
-        directory = os.listdir(current_date_directory)
+        directory = sorted(os.listdir(current_date_directory), key=lambda x: datetime.strptime(x[:19], "%Y-%m-%d_%H-%M-%S"))
         file_time_list = [datetime.strptime(files[:19], "%Y-%m-%d_%H-%M-%S") for files in directory]
 
         intended_file_location = bisect.bisect_left(file_time_list, date)
