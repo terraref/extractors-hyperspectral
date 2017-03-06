@@ -127,12 +127,12 @@ def main(date_string, EL_root_directory):
     wavelength  = wavelength_extractor(file_list)
 
     output_data_name = "calibration_el_realtime_"+date_string.replace("/","_").replace(" ", "_")+".nc"
-    
+
     ########## Write into the output file ##########
     with Dataset(output_data_name,"w",format="NETCDF4") as output_handle:
-        output_handle.createDimension("wvl", len(wavelength))
-        output_handle.createVariable("weighted_average_downwelling_irradiance", "f8", ("wvl",))
-        output_handle.createVariable("wvl_lgr", "f8", ("wvl",))
+        output_handle.createDimension("wvl_lgr", len(wavelength))
+        output_handle.createVariable("weighted_average_downwelling_irradiance", "f8", ("wvl_lgr",))
+        output_handle.createVariable("wvl_lgr", "f8", ("wvl_lgr",))
         result = weighted_avg_calculator(date_object, *flx_spc_dwn)
 
         output_handle.variables["wvl_lgr"][:] = wavelength
