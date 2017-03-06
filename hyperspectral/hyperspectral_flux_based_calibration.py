@@ -6,7 +6,7 @@ import bisect
 import os.path
 import numpy as np
 from datetime import date, datetime, timedelta
-from netCDF import Dataset
+from netCDF4 import Dataset
 
 '''
 The date should be in format
