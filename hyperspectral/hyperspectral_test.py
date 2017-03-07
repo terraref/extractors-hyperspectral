@@ -52,7 +52,7 @@ TEST_FILE_DIRECTORY           = None
 MAXIMUM_SATURATED_EXPOSURE    = 0
 
 
-class HyperspectralWorkflowTest(unittest.TestCase, HyperspectralWorkflowTestWidget):
+class HyperspectralWorkflowTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
