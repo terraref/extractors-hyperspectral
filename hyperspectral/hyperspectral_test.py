@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+import numpy as np
 import unittest
 import sys
 from netCDF4 import Dataset
@@ -246,7 +246,7 @@ class HyperspectralWorkflowTest(unittest.TestCase):
     # Walk through the reflectance image and compare with the max.sat.exp. to see whether it is overexposured
     @unittest.expectedFailure
     def testCalibrationGraphIsOverExposured(self):
-        self.graph = self.masterNetCDFHandler.variables["rfl_img"]
+        self.graph = np.array(self.masterNetCDFHandler.variables["rfl_img"])
         result = (self.graph > MAXIMUM_SATURATED_EXPOSURE).any()
         self.assertTrue(result, msg="The graph is overexposured (i.e., has the pixel grater than the max. saturated exposure)")
 
