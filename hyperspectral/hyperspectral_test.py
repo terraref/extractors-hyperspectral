@@ -248,7 +248,7 @@ class HyperspectralWorkflowTest(unittest.TestCase):
     def testCalibrationGraphIsOverExposured(self):
         self.graph = np.array(self.masterNetCDFHandler.variables["rfl_img"])
         result = (self.graph > MAXIMUM_SATURATED_EXPOSURE).any()
-        self.assertTrue(result, msg="The graph is overexposured (i.e., has the pixel grater than the max. saturated exposure)")
+        self.assertFalse(result, msg="The graph is overexposured (i.e., has the pixel grater than the max. saturated exposure)")
 
 
 if __name__ == "__main__":
