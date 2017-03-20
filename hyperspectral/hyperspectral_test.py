@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+import numpy as np
 import unittest
 import sys
 from netCDF4 import Dataset
@@ -14,9 +14,9 @@ and will take one or two samples to check the values.
 
 ==============================================================================
 To run the test from the commandline, do:
-python hyperspectral_test.py <input_netCDF_file> <verbosity_level>
+python hyperspectral_test.py <input_netCDF_file> <verbosity_level> <maximum_saturated_exposure>
 
-* verbosity level can be 0, 1 or 2 (from the quietest to most verbose)
+* verbosity level can be 0, 1 or 2 (from the quietest to the most verbose)
 
 ==============================================================================
 It will check the followings so far:
@@ -49,22 +49,10 @@ NOTES:
 EXPECTED_NUMBER_OF_GROUPS     = 6
 EXPECTED_NUMBER_OF_DIMENSIONS = 4
 TEST_FILE_DIRECTORY           = None
-
-class HyperspectralWorkflowTestWidget:
-
-    @staticmethod
-    def ParameterizedTest(Parameters={}):
-        def outerWrapper(func):
-            def innerWrapper(self):
-                funcGlobals = func.func_globals
-                funcGlobals["Parameters"] = Parameters
-
-                return func(self)
-            return innerWrapper
-        return outerWrapper
+MAXIMUM_SATURATED_EXPOSURE    = 0
 
 
-class HyperspectralWorkflowTest(unittest.TestCase, HyperspectralWorkflowTestWidget):
+class HyperspectralWorkflowTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -242,24 +230,30 @@ class HyperspectralWorkflowTest(unittest.TestCase, HyperspectralWorkflowTestWidg
     #     self.assertEqual(self.variable_metadata["speed_x"].long_name, "Gantry Speed in X Direction", msg="The speed should has a correctly formatted long name")
 
     # Marked as a parameterized testcases; will be executed several times
-    @HyperspectralWorkflowTestWidget.ParameterizedTest(["units", "reference_point", "long_name", "algorithm"])
     def testXHasEnoughAttributes(self):
         self.x = self.masterNetCDFHandler.variables["x"]
 
-        for potentialAttributes in Parameters:
+        for potentialAttributes in ["units", "reference_point", "long_name", "algorithm"]:
             self.assertHasAttribute(self.x, potentialAttributes, msg="X has missing attributes")
 
     # Marked as a parameterized testcases; will be executed several times
-    @HyperspectralWorkflowTestWidget.ParameterizedTest(["units", "reference_point", "long_name", "algorithm"])
     def testYHasEnoughAttributes(self):
         self.y = self.masterNetCDFHandler.variables["y"]
         
-        for potentialAttributes in Parameters:
+        for potentialAttributes in ["units", "reference_point", "long_name", "algorithm"]:
             self.assertHasAttribute(self.y, potentialAttributes, msg="Y has missing attributes")
+
+    # Walk through the reflectance image and compare with the max.sat.exp. to see whether it is overexposured
+    @unittest.expectedFailure
+    def testCalibrationGraphIsOverExposured(self):
+        self.graph = np.array(self.masterNetCDFHandler.variables["rfl_img"])
+        result = (self.graph > MAXIMUM_SATURATED_EXPOSURE).any()
+        self.assertFalse(result, msg="The graph is overexposured (i.e., has the pixel grater than the max. saturated exposure)")
 
 
 if __name__ == "__main__":
     TEST_FILE_DIRECTORY = sys.argv[1]
+    MAXIMUM_SATURATED_EXPOSURE = sys.argv[-1] if len(sys.argv) == 4 else 0
     testSuite   = unittest.TestLoader().loadTestsFromTestCase(HyperspectralWorkflowTest)
     runner      = unittest.TextTestRunner(verbosity=int(sys.argv[2])).run(testSuite)
     returnValue = runner.wasSuccessful()
