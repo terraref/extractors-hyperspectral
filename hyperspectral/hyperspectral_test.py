@@ -49,7 +49,7 @@ NOTES:
 EXPECTED_NUMBER_OF_GROUPS     = 6
 EXPECTED_NUMBER_OF_DIMENSIONS = 4
 TEST_FILE_DIRECTORY           = None
-MAXIMUM_SATURATED_EXPOSURE    = 0
+MAXIMUM_SATURATED_REFLECTANCE = 0
 
 
 class HyperspectralWorkflowTest(unittest.TestCase):
@@ -253,7 +253,7 @@ class HyperspectralWorkflowTest(unittest.TestCase):
 
 if __name__ == "__main__":
     TEST_FILE_DIRECTORY = sys.argv[1]
-    MAXIMUM_SATURATED_EXPOSURE = sys.argv[-1] if len(sys.argv) == 4 else 0
+    MAXIMUM_SATURATED_REFLECTANCE = float(sys.argv[-1]) if len(sys.argv) == 4 else 0.4
     testSuite   = unittest.TestLoader().loadTestsFromTestCase(HyperspectralWorkflowTest)
     runner      = unittest.TextTestRunner(verbosity=int(sys.argv[2])).run(testSuite)
     returnValue = runner.wasSuccessful()

@@ -45,7 +45,7 @@ GOOGLE_MAP_TEMPLATE = "https://maps.googleapis.com/maps/api/staticmap?size=1280x
 
 ORIENTATION_MATRIX = np.array([[CAMERA_FOCAL_LENGTH / PIXEL_PITCH, GAMMA, 0], [0, CAMERA_FOCAL_LENGTH / PIXEL_PITCH, 0 ], [0, 0, 1]])
 
-def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption):
+def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption, downsampled=False):
 
     ######################### Load necessary data #########################
     with open(jsonFileLocation) as fileHandler:
@@ -93,7 +93,11 @@ def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption):
         y_absolute_pos = y_gantry_pos + y_camera_pos
 
         x_final_result = np.array([x * x_pixel_size for x in range(x_pixel_num)]) + x_absolute_pos
-        y_final_result = np.array([y * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
+
+        if not downsampled:
+            y_final_result = np.array([y * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
+        else:
+            y_final_result = np.array([y * 1.5 * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
 
         ########### Sample result: x -> 0.377 [m], y -> 0.267 [m] ###########
 
