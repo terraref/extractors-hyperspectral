@@ -202,8 +202,13 @@ class DataContainer(object):
 
         ########################### Adding geographic positions ###########################
 
+        if "scanSpeedInMPerS" in dir(netCDFHandler.groups["gantry_system_variable_metadata"]):
+            downsample_opt = netCDFHandler.groups["gantry_system_variable_metadata"].variables["scanSpeedInMPerS"][...] == 0.04 and\
+                             netCDFHandler.groups["sensor_variable_metadata"].variables["frameperiod"][...] > 25 
+        else:
+            downsample_opt = False
         
-        geo_data = pixel2Geographic("".join((inputFilePath[:-4],"_metadata.json")), "".join((inputFilePath,'.hdr')), camera_opt)
+        geo_data = pixel2Geographic("".join((inputFilePath[:-4],"_metadata.json")), "".join((inputFilePath,'.hdr')), camera_opt, downsampled=downsample_opt)
 
         # Check if the image width and height are correctly collected.
         # assert len(xPixelsLocation) > 0 and len(yPixelsLocation) > 0, "ERROR: Failed to collect the image size metadata from " + "".join((inputFilePath,'.hdr')) + ". Please check the file."
