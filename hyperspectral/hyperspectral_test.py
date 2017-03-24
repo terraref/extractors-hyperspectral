@@ -57,6 +57,7 @@ DEFAULT_SATURATED_EXPOSURE    = 2**16 - 1
 MAXIMUM_SATURATED_REFLECTANCE = 0
 
 
+
 class HyperspectralWorkflowTest(unittest.TestCase):
 
     @classmethod
@@ -276,9 +277,13 @@ if __name__ == "__main__":
                              help='The maximum saturated exposure that has physical meaning (default=2^16-1)')
 
     args = test_parser.parse_args()
+<<<<<<< 84de9ca45ca4bb88c6200f1d7d081778cc2e7312
 
     TEST_FILE_DIRECTORY = sys.argv[1]
     MAXIMUM_SATURATED_REFLECTANCE = float(sys.argv[-1]) if len(sys.argv) == 4 else 0.4
+    TEST_FILE_DIRECTORY       = args.input_file_path[0]
+    MAXIMUM_PLANT_REFLECTANCE = args.maximum_planet_reflectance
+    SATURATED_EXPOSURE        = args.saturated_exposure
     testSuite   = unittest.TestLoader().loadTestsFromTestCase(HyperspectralWorkflowTest)
     runner      = unittest.TextTestRunner(verbosity=args.verbosity).run(testSuite)
     returnValue = runner.wasSuccessful()
