@@ -5,21 +5,21 @@
    by default the averages of the required reflectances is calculated. (these have the postfix suffix "_avg" )
    These averages are then used to calculate the average of the indices. 
 
-   If requried the average  indices can be calculated after the ratio step. 
-   ( these  indices have the postfix suffix "_rba" )
-   Note the following indices are NOT ratio's ( "WI"  )
 
     
    set the following flags on the ncap2 command line 
    flg_dbg - if set then print debug info (default 0) 
   
-   flg_px - if set then calculate the averages after the ratio step (default 1)
+   flg_abr - if set then calculate the averages before the ratio step  (default 0)
+
+   flg_rba - if set then calculate the ratio (pixels) before the average step  (default 1)
   
    flg_mss - set the _FillValue 1.0e36 to all values in selected reflectances where value <=0.0f (default 1)
-
+    
+   flg_bgi - calculate the Broadband-Greenness-Indices
    usage examples 
    ncap2 -v -O  -S hyperspectral_indices_make.nco   in.nc out.nc                                         ( use default flags)     
-   ncap2 -v -O -s 'flg_dbg=1s;flg_rba=0s;flg_mss=1s;' -S hyperspectral_indices_make.nco   in.nc out.nc   ( set flags )
+   ncap2 -v -O -s 'flg_dbg=1s;flg_rba=1s;flg_mss=1s;' -S hyperspectral_indices_make.nco   in.nc out.nc   ( set flags )
 
 
 */
@@ -29,25 +29,72 @@
 if(!exists(flg_dbg))
    *flg_dbg=0s;  // [flg] Print debug info
 
-if(!exists(flg_px))
-   *flg_px=1s;  // [flg] calculate averages from (pixel) ratios (plain formula )
+if(!exists(flg_rba))
+   *flg_rba=1s;  // [flg] (ratio before average)  calculate average from _pxl ratio
+
+
+if(!exists(flg_abr))
+   *flg_abr=0s;  // [flg] (average before ratio) - calculate averages reflectances - then calculate ratios with these avergaes
+                //       result is a scalar - (stored as an attribute)  
+
+
 
 if(!exists(flg_mss)){
   *flg_mss=1s;  // [flg] add and set _FillValue to reflectance indices
-  flt_mss=1.0e36f;
+  *flt_mss=1.0e36f;
 }
+
+if(!exists(flg_std))
+  *flg_std=1s;  // [flg] calculate the standard indices
+
+
+
+
+if(!exists(flg_bgi))
+  *flg_bgi=1s;  // [flg] calculate the Broadband Greenness Indices
+
+
+if(!exists(flg_ngi))
+  *flg_ngi=1s;  // [flg] calculate the Narrowband Greenness Indices
+
+// March 2017 - this contains SWIR wavelengths 
+if(!exists(flg_cni))
+  *flg_cni=0s; // [flg] // Canopy Nitrogen Indices
+
+// March 2017 - this contains SWIR wavelengths - so default is OFF
+if(!exists(flg_sci)) 
+  *flg_sci=0s; // [flg] // Dry or Senescent Carbon Indices 
+
+if(!exists(flg_lpi))
+  *flg_lpi=1s; // [flg] // Leaf Pigments Indices
+
+// March 2017 - this contains SWIR wavelengths -so default is OFF
+if(!exists(flg_cwci))
+  *flg_cwci=0s; // [flg] // Canopy Water Content Indices
+
+if(!exists(flg_sdi))
+  *flg_sdi=1s; // [flg] // Spectral Disease Indices
+
+// March 2017 - this contains SWIR wavelengths -so default is OFF
+if(!exists(flg_dwsi))
+  *flg_dwsi=0s; // [flg] Disease Water Stress Indices
+
+// March 2017 - this contains  LSI that is commented out as it contains SWIR elements
+if(!exists(flg_mi))
+  *flg_mi=1s; // [flg] // Misc Indices + Stress Detection Indices
 
 
 
 
 //required reflectances
-@rfl_lst={"R445"s,"R450"s,"R470"s, "R500"s,"R512"s,"R531"s, "R540"s,"R550"s,"R570"s,"R586"s,"R590"s,"R600"s,"R650"s,"R670"s, "R680"s,"R690"s,"R700"s,"R705"s,"R710"s,"R720"s,"R740"s,"R750"s,"R760"s, "R780"s,"R790"s,"R800"s,"R900"s,"R970"s};  
+@rfl_lst={"R415"s,"R420"s,"R430"s,"R435"s,"R440"s,"R445"s,"R450"s,"R470"s, "R500"s,"R510"s,"R512"s,"R513"s,"R520"s,"R531"s,"R534"s, "R540"s,"R550"s,"R554"s,"R570"s,"R584"s,"R586"s,"R590"s,"R600"s,"R650"s,"R670"s,"R677"s, "R680"s,"R690"s,"R695"s,"R698"s, "R700"s,"R704"s,"R705"s,"R710"s,"R715"s,"R726"s,"R720"s,"R724"s,"R726"s,"R734"s,"R740"s,"R747"s,"R750"s,"R760"s, "R780"s,"R790"s,"R800"s,"R900"s,"R970"s};  
 
 // nb ONE-TO_ONE  correspondence with above list
-@dbl_val_lst={ 4.45e-7d, 4.5e-7d, 4.7e-7d, 5.0e-7d, 5.12e-7, 5.31e-7, 5.4e-7, 5.5e-7, 5.7e-7,5.86e-7, 5.9e-7,6.0e-7,6.5e-7,6.7e-7, 6.8e-7, 6.9e-7, 7.0e-7, 7.05e-7, 7.1e-7,7.2e-7, 7.4e-7,7.5e-7,7.6e-7, 7.8e-7, 7.9e-7, 8.0e-7, 9.0e-7,9.7e-7};    
+@dbl_val_lst={4.15e-07, 4.2e-07, 4.3e-07, 4.35e-07, 4.4e-07, 4.45e-07, 4.5e-07, 4.7e-07, 5e-07, 5.1e-07, 5.12e-07, 5.13e-07, 5.2e-07, 5.31e-07, 5.34e-07, 5.4e-07, 5.5e-07, 5.54e-07, 5.7e-07, 5.84e-07, 5.86e-07, 5.9e-07, 6e-07, 6.5e-07, 6.7e-07, 6.77e-07, 6.8e-07, 6.9e-07, 6.95e-07, 6.98e-07, 7e-07, 7.04e-07, 7.05e-07, 7.1e-07, 7.15e-07, 7.26e-07, 7.2e-07, 7.24e-07, 7.26e-07, 7.34e-07, 7.4e-07, 7.47e-07, 7.5e-07, 7.6e-07, 7.8e-07, 7.9e-07, 8e-07, 9e-07, 9.7e-07};
+
 
 // use vpointers to calculate averages AFTER pixel ratios 
-// 6-March 2017 - list not used right now but could be usefull later 
+// 6-March 2017 - list not used right now but could be useful later 
 @ind_lst={"NDVI"s,"SR"s, "OSAVI"s,"CHL"s,"msR705"s,"TCARI"s,"CarChap"s,"Car1Black"s,"Car2Black"s,"PRI570"s,"SIPI"s,"antGamon"s,"antGitelson"s,"CHLDela"s,"CI"s,"PRI586"s,"PRI512"s,"FRI1"s,"FRI2"s,"NDVI1"s,"RERI"s,"ZM"s,"REP"s,"NDRE"s,"TVI"s};
 
 
@@ -60,6 +107,7 @@ if( @rfl_lst.size() != @dbl_val_lst.size() )
 }
 
 
+
 /* extract the required reflectances - 
    nb min_coords() -extracts the index of the grid value nearest the required value 
    This step creates the vars iR445, iR450, iR470..iR970 */
@@ -67,21 +115,26 @@ if( @rfl_lst.size() != @dbl_val_lst.size() )
   *idx=0;
   *sz=@rfl_lst.size();
 
+  print(@rfl_lst.size());
+   
   for(idx=0;idx<sz;idx++)
   {
     @R_nm=sprint(@rfl_lst(idx));
     @iR_nm=push("i",@R_nm);
+    // @R_nbr=atoi(@R_nm(1:)).double()*1.0e-9d;
+    //*@iR_nm=min_coords(wavelength,@R_nbr);
+    
+    //print(@R_nbr);
 
-    *@iR_nm=min_coords(wavelength,@dbl_val_lst(idx));
-          
-  }
+    // nb '**' create a RAM var from a var-pointer
+    **@iR_nm=min_coords(wavelength,@dbl_val_lst(idx));
+       
+}
 
 
 }
 
-
-
-/* sanity checks for required relectances -  make sure the are within resonable tolerance (1.0e-9) */
+/* sanity checks for required relectances -  make sure the are within reasonable tolerance (1.0e-9) */
 if( fabs(wavelength(iR445)-4.45e-7) > 0.01e-7d )  
 {
   print("wavelength R445 not in wavelength coord\n");  
@@ -117,7 +170,8 @@ if( fabs(wavelength(iR700)-7e-7) > 0.01e-7d )
     @var_nm_avg=push(@var_nm,"_avg");
 
     /* create R* variables from hyperslab */
-    *@var_nm=rfl_img(*@var_inm,:,:);
+    /* nb '**' means screate a RAM var from a var-pointer */
+    **@var_nm=rfl_img(*@var_inm,:,:);
    
 
     
@@ -131,6 +185,7 @@ if( fabs(wavelength(iR700)-7e-7) > 0.01e-7d )
    }
 
     /* create avg of hyperslabs */
+   if(flg_abr)
     *@var_nm_avg=*@var_nm.avg();
   
     if(flg_dbg)
@@ -140,350 +195,879 @@ if( fabs(wavelength(iR700)-7e-7) > 0.01e-7d )
 
 }
 
+if(flg_std){
+
+  NDVI_pxl = ( R900 -R680) / (R900+R680 );
+  NDVI=NDVI_pxl.avg();
+  NDVI@long_name="Normalized Difference Vegetation Index";
+  NDVI@standard_name="normalized_difference_vegetation_index";
+  NDVI@description="Normalized Difference Vegetation Index | (R900-R680)/(R900+R680) | Rouse et al. (1973)";
+  NDVI@notes="Normalized Difference Vegetation Index | NDVI";
+  NDVI@units="ratio";
+  NDV@label="Reflectance Index";
+  NDVI@type="trait";
+  if(flg_abr)
+    NDVI@abr = ( R900_avg -R680_avg) / (R900_avg+R680_avg );
+
+
+  SR_pxl=R900 / R680;
+  SR=SR_pxl.avg();
+  SR@long_name="Simple ratio";
+  SR@standard_name="simple_ratio";
+  SR@description="Simple ratio | R900 / R680 | Rouse et al. (1973)";
+  SR@notes="Simple ratio | SR";
+  SR@units="ratio";
+  SR@label="Reflectance Index";
+  SR@type="trait";
+  if(flg_abr)
+    SR_abr=R900_avg / R680_avg;
+
+
+  OSAVI_pxl=1.16f*( (R800-R670) ) /  ( R800+R670+0.16f);
+  OSAVI=OSAVI_pxl.avg();
+  OSAVI@long_name="Optimized Soil-Adjusted Vegetation index";
+  OSAVI@standard_name="optimized_soil-adjusted_vegetation_index";
+  OSAVI@description="Optimized Soil-Adjusted Vegetation index | 1.16f*( (R800-R670) ) /  ( R800+R670+0.16f) | Rondeaux et al. (1996)";
+  OSAVI@notes="Optimized Soil-Adjusted Vegetation index | OSAVI";
+  OSAVI@units="ratio";
+  OSAVI@label="Reflectance Index";
+  OSAVI@type="trait";
+  if(flg_abr)
+    OSAVI@abr=1.16f*( (R800_avg-R670_avg) ) /  ( R800_avg+R670_avg+0.16f);
+  
+  
+
+
+  WI_pxl=R900-R970;
+  WI=WI_pxl.avg();
+  WI@long_name="water index";
+  WI@standard_name="water_index";
+  WI@description="water index | R900-R970 | Penuelas. et al. (1993)";
+  WI@notes="water index | WI";
+  WI@units="ratio";
+  WI@label="Reflectance Index";
+  WI@type="trait";
+  if(flg_abr)
+    WI@abr=R900_avg-R970_avg;
+  
+
+  CHL_pxl=R750 / R550;
+  CHL=CHL_pxl.avg();
+  CHL@long_name="Chlorophyll index";
+  CHL@standard_name="chlorophyll_index";
+  CHL@description="Chlorophyll index | R750 / R550 | Gitelson and Merzlyak (1994)";
+  CHL@notes="Chlorophyll index | CHL";
+  CHL@units="ratio";
+  CHL@label="Reflectance Index";
+  CHL@type="trait";
+  if(flg_abr)
+    CHL@abr=R750_avg / R550_avg;
+
+
+
+
+  msR705_pxl= (R750-R445) / (R705-R445);
+  msR705=msR705_pxl.avg();
+  msR705@long_name="Modified simple ratio 705";
+  msR705@standard_name="modified_simple_ratio_705";
+  msR705@description="Modified simple ratio 705 | (R750-R445) / (R705-R445) | Sims and Gamon (2002)";
+  msR705@notes="Modified simple ratio 705 | msR705";
+  msR705@units="ratio";
+  msR705@label="Reflectance Index";
+  msR705@type="trait";
+  if(flg_abr)
+    msR705@abr= (R750_avg-R445_avg) / (R705_avg-R445_avg);
+
+
+  TCARI_pxl=3.0f*(  (R700-R670)-0.2f * (R700-R550) * (R700/R670)  );
+  TCARI=TCARI_pxl.avg();
+  TCARI@long_name="Transformed chlorophyll absorption in reflectance index";
+  TCARI@standard_name="transformed_chlorophyll_absorption_in_reflectance_index";
+  TCARI@description="Transformed chlorophyll absorption in reflectance index | 3.0f*(  (R700-R670)-0.2f * (R700-R550) * (R700/R670)  ) | Haboudane et al. (2002)";
+  TCARI@notes="Transformed chlorophyll absorption in reflectance index | TCARI";
+  TCARI@units="ratio";
+  TCARI@label="Reflectance Index";
+  TCARI@type="trait";
+  if(flg_abr)
+    TCARI@abr=3.0f*(  (R700_avg-R670_avg)-0.2f * (R700_avg-R550_avg) * (R700_avg/R670_avg)  );
+
+
+
+  CarChap_pxl=R760/R500;
+  CarChap=CarChap_pxl.avg();
+  CarChap@long_name="Carotenoid index (Chappelle)";
+  CarChap@standard_name="carotenoid_index_(chappelle)";
+  CarChap@description="Carotenoid index (Chappelle) | R760/R500 | Chappelle et al. (1992)";
+  CarChap@notes="Carotenoid index (Chappelle) | CarChap";
+  CarChap@label="Reflectance Index";
+  CarChap@type="trait";
+  if(flg_abr)
+    CarChap@abr=R760_avg/R500_avg;
+
+
+  Car1Black_pxl=R800/R470;
+  Car1Black=Car1Black_pxl.avg();
+  Car1Black@long_name="Carotenoid index (BlackBurn)";
+  Car1Black@standard_name="carotenoid_index_(blackburn)";
+  Car1Black@description="Carotenoid index (BlackBurn) | R800/R470 | Blackburn (1998)";
+  Car1Black@notes="Carotenoid index (BlackBurn) | Car1Black";
+  Car1Black@units="ratio";
+  Car1Black@label="Reflectance Index";
+  Car1Black@type="trait";
+  if(flg_abr)
+    Car1Black@abr=R800_avg/R470_avg;
+  
+
+
+  Car2Black_pxl= ( R800 - R470 ) / (R800 + R470);
+  Car2Black=Car2Black_pxl.avg();
+  Car2Black@long_name="Carotenoid index 2 (BlackBurn)";
+  Car2Black@standard_name="carotenoid_index_2_(blackBurn)";
+  Car2Black@description="Carotenoid index 2 (BlackBurn) | ( R800 - R470 ) / (R800 + R470) | Blackburn (1998)";
+  Car2Black@notes="Carotenoid index 2 (BlackBurn) | Car2Black";
+  Car2Black@units="ratio";
+  Car2Black@label="Reflectance Index";
+  Car2Black@type="trait";
+  if(flg_abr)
+    Car2Black@abr= ( R800_avg - R470_avg ) / (R800_avg + R470_avg);
+
+  
+
+
+  PRI570_pxl = (R531 - R570) / (R531+R570);
+  PRI570=PRI570_pxl.avg();
+  PRI570@long_name="Photochemical reflectance index (570)";
+  PRI570@standard_name="photochemical_reflectance_index_(570)";
+  PRI570@description="Photochemical reflectance index (570) | (R531 - R570) / (R531+R570) | Gamon et al. (1992)";
+  PRI570@notes="Photochemical reflectance index (570) | PRI570";
+  PRI570@units="ratio";
+  PRI570@label="Reflectance Index";
+  PRI570@type="trait";
+  if(flg_abr)
+    PRI570@abr = (R531_avg - R570_avg) / (R531_avg+R570_avg);
+
+
+  SIPI_pxl =( R800 - R450) / (R800 + R650);
+  SIPI=SIPI_pxl.avg();
+  SIPI@long_name="Structure intensive pigment index";
+  SIPI@standard_name="structure_intensive_pigment_index";
+  SIPI@description="Structure intensive pigment index | ( R800 - R450) / (R800 + R650) | Penuelas. et al. (1995)";
+  SIPI@notes="Structure intensive pigment index | SIPI";
+  SIPI@units="ratio";
+  SIPI@label="Reflectance Index";
+  SIPI@type="trait";
+  if(flg_abr)
+    SIPI@abr =( R800_avg - R450_avg) / (R800_avg + R650_avg);
+
+
+
+  antGamon_pxl=R650/R550;
+  antGamon=antGamon_pxl.avg();
+  antGamon@long_name="Anthocyanin (Gamon)";
+  antGamon@standard_name="anthocyanin_(gamon)";
+  antGamon@description="Anthocyanin (Gamon) | R650/R550 | Gamon and Surfus (1999)";
+  antGamon@notes="Anthocyanin (Gamon) | antGamon";
+  antGamon@units="ratio";
+  antGamon@label="Reflectance Index";
+  antGamon@type="trait";
+
+  if(flg_abr)
+    antGamon@abr=R650_avg/R550_avg;
+
+
+
+  antGitelson_pxl=( 1.0f/R550 - 1.0f/R700)*R780;
+  antGitelson=antGitelson_pxl.avg();
+  antGitelson@long_name="Anthocyanin (Gitelson)";
+  antGitelson@standard_name="anthocyanin_(gitelson)";
+  antGitelson@description="Anthocyanin (Gitelson) | ( 1.0f/R550 - 1.0f/R700)*R780 | Gitelson et al.(2003,2006)";
+  antGitelson@notes="Anthocyanin (Gitelson) | antGitelson";
+  antGitelson@units="ratio";
+  antGitelson@label="Reflectance Index";
+  antGitelson@type="trait";
+  if(flg_abr)
+    antGitelson@abr=( 1.0f/R550_avg - 1.0f/R700_avg)*R780_avg;
+
+
+  CHLDela_pxl=( R540-R590 ) / ( R540 + R590);
+  CHLDela=CHLDela_pxl.avg();
+  CHLDela@long_name="Chlorophyll content";
+  CHLDela@standard_name="chlorophyll_content";
+  CHLDela@description="Chlorophyll content | ( R540-R590 ) / ( R540 + R590) | Delaieux et al. (2014)";
+  CHLDela@notes="Chlorophyll content | CHLDela";
+  CHLDela@units="ratio";
+  CHLDela@label="Reflectance Index";
+  CHLDela@type="trait";
+  if(flg_abr)
+    CHLDela@abr=( R540_avg-R590_avg ) / ( R540_avg + R590_avg);
+
+
+
+  CI_pxl=( R750-R705 ) / ( R750 + R705);
+  CI=CI_pxl.avg();
+  CI@long_name="Chlorophyll index";
+  CI@standard_name="chlorophyll_index";
+  CI@description="Chlorophyll index | ( R750-R705 ) / ( R750 + R705) | Gitelson and Merzlyak (1994)";
+  CI@notes="Chlorophyll index | CI";
+  CI@units="ratio";
+  CI@label="Reflectance Index";
+  CI@type="trait";
+  if(flg_abr)
+    CI@abr=( R750_avg-R705_avg ) / ( R750_avg + R705_avg);
+
+
+
+  PRI586_pxl=( R531-R586) / ( R531 + R586);
+  PRI586=PRI586_pxl.avg();
+  PRI586@long_name="Photochemical reflectance index (586)";
+  PRI586@standard_name="photochemical_reflectance_index_(586)";
+  PRI586@description="Photochemical reflectance index (586) | ( R531-R586) / ( R531 + R586) | Panigada et al. (2014)";
+  PRI586@notes="Photochemical reflectance index (586) | PRI586";
+  PRI586@units="ratio";
+  PRI586@label="Reflectance Index";
+  PRI586@type="trait";
+  if(flg_abr)
+    PRI586@abr=( R531_avg-R586_avg) / ( R531_avg + R586_avg);
+
+
+  PRI512_pxl=( R531-R512) / ( R531 + R512);
+  PRI512=PRI512_pxl.avg();
+  PRI512@long_name="Photochemical reflectance index (512)";
+  PRI512@standard_name="photochemical_reflectance_index_(512)";
+  PRI512@description="Photochemical reflectance index (512) | ( R531-R512) / ( R531 + R512) | Hernández-Clemente et al. (2011)";
+  PRI512@notes="Photochemical reflectance index (512) | PRI512";
+  PRI512@units="ratio";
+  PRI512@label="Reflectance Index";
+  PRI512@type="trait";
+  if(flg_abr)
+    PRI512@abr=( R531_avg-R512_avg) / ( R531_avg + R512_avg);
+
+
+  FRI1_pxl=R690 / R600;
+  FRI1_=FRI1_pxl.avg();
+  FRI1@long_name="Fluorescence ratio index1";
+  FRI1@standard_name="fluorescence_ratio_index1";
+  FRI1@description="Fluorescence ratio index1 | R690 / R600 | Dobrowski et al. (2005)";
+  FRI1@notes="Fluorescence ratio index1 | FRI1";
+  FRI1@units="ratio";
+  FRI1@label="Reflectance Index";
+  FRI1@type="trait";
+  if(flg_abr)
+    FRI1@abr=R690_avg / R600_avg;
+
+
+
+  FRI2_pxl=R740 / R800;
+  FRI2=FRI2_pxl.avg();
+  FRI2@long_name="Fluorescence ratio indices 2";
+  FRI2@standard_name="fluorescence_ratio_indices_2";
+  FRI2@description="Fluorescence ratio indices 2 | R740 / R800 | Dobrowski et al. (2005)";
+  FRI2@notes="Fluorescence ratio indices 2 | FRI2";
+  FRI2@units="ratio";
+  FRI2@label="Reflectance Index";
+  FRI2@type="trait";
+  if(flg_abr)
+    FRI2@abr=R740_avg / R800_avg;
+
+
+  NDVI1_pxl=(R800-R670)/ (R800+R670);
+  NDVI1=NDVI1_pxl.avg();
+  NDVI1@long_name="Normalized Difference Vegetation Index1";
+  NDVI1@standard_name="normalized_difference_vegetation_index1";
+  NDVI1@description="Normalized Difference Vegetation Index1 | (R800-R670)/ (R800+R670) | Rouse et al. (1973)";
+  NDVI1@notes="Normalized Difference Vegetation Index1 | NDVI1";
+  NDVI1@units="ratio";
+  NDVI1@label="Reflectance Index";
+  NDVI1@type="trait";
+  if(flg_abr)
+    NDVI1@abr=(R800_avg-R670_avg)/ (R800_avg+R670_avg);
+
+
+  RDVI_pxl=NDVI1_pxl*0.5f;
+  RDVI=RDVI_pxl.avg();
+  RDVI@long_name="Renormalized Difference Vegetation Index";
+  RDVI@standard_name="renormalized_difference_vegetation_index";
+  RDVI@description="Renormalized Difference Vegetation Index | NDVI1*0.5f | Rougean and Breon (1995)";
+  RDVI@notes="Renormalized Difference Vegetation Index | RDVI";
+  RDVI@units="ratio";
+  RDVI@label="Reflectance Index";
+  RDVI@type="trait";
+  if(flg_abr)
+    RDVI@abr=NDVI1@abr*0.5f;
+
+  RERI_pxl=R700/R670;
+  RERI=RERI_pxl.avg();
+  RERI@long_name="Red edge ratio index";
+  RERI@standard_name="red_edge_ratio_index";
+  RERI@description="Red edge ratio index | R700/R670 | Part of TCARI index";
+  RERI@notes="Red edge ratio index | RERI";
+  RERI@units="ratio";
+  RERI@label="Reflectance Index";
+  RERI@type="trait";
+  if(flg_abr)
+    RERI@abr=R700_avg/R670_avg;
+
+
+  ZM_pxl= R750 / R710;
+  ZM=ZM_pxl.avg();
+  ZM@long_name="Red edge";
+  ZM@standard_name="red_edge";
+  ZM@description="Red edge | R750 / R710 | Zarco-Tejada et al. (2001)";
+  ZM@notes="Red edge | ZM";
+  ZM@units="ratio";
+  ZM@label="Reflectance Index";
+  ZM@type="trait";
+  if(flg_abr)
+    ZM@abr= R750_avg / R710_avg;
+
+
+  REP_pxl=700.0f +40.0f*(((R670+R780)/2-R700) /(R740-R700));
+  REP=REP_pxl.avg();
+  REP@long_name="Red edge position";
+  REP@standard_name="red_edge_position";
+  REP@description="Red edge position | 700.0f +40.0f*(((R670+R780)/2-R700) /(R740-R700)) | Guyot and Baret, 1988";
+  REP@notes="Red edge position | REP";
+  REP@units="ratio";
+  REP@label="Reflectance Index";
+  REP@type="trait";
+  if(flg_abr)
+    REP@abr=700.0f +40.0f*(((R670_avg+R780_avg)/2-R700_avg) /(R740_avg-R700_avg));
+
+
+  NDRE_pxl=(R790-R720)/(R790+R720);
+  NDRE=NDRE_pxl.avg();
+  NDRE@long_name="Normalized difference vegetation index";
+  NDRE@standard_name="normalized_difference_vegetation_index";
+  NDRE@description="Normalized difference vegetation index | (R790-R720)/(R790+R720) | Barnes et al. (2000)";
+  NDRE@notes="Normalized differenc vegetation index | NDRE";
+  NDRE@units="ratio";
+  NDRE@label="Reflectance Index";
+  NDRE@type="trait";
+  if(flg_abr)
+    NDRE@abr=(R790_avg-R720_avg)/(R790_avg+R720_avg);
+
+
+  TVI_pxl=pow( 0.5f, (120.0f*(R750-R550)-200.0f*(R670-R550)));
+  TVI=TVI_pxl.avg();
+  TVI@long_name="Triangular Vegetation Index";
+  TVI@standard_name="triangular_vegetation_index";
+  TVI@description="Triangular Vegetation Index | 0.5f**(120.0f*(R750-R550)-200.0f*(R670-R550))) | Haboudaneet al. (2004)";
+  TVI@notes="Triangular Vegetation Index | TVI";
+  TVI@units="ratio";
+  TVI@label="Reflectance Index";
+  TVI@type="trait";
+  if(flg_abr)
+    TVI@abr=pow( 0.5f, (120.0f*(R750_avg-R550_avg)-200.0f*(R670_avg-R550_avg)));
+
+ }
+
+
+// LemnaTec: Broadband Greenness Indices
+if(flg_bgi){
+
+  EVI_pxl = 2.5f * (R800 - R680) / (R800 + 6.0f * R680 - 7.5f * R450 + 1.0f);
+  EVI=EVI_pxl.avg();
+  EVI@long_name="Enhanced Vegetation Index [Huete et al. (1997)]";
+  if(flg_abr)
+    EVI@abr= 2.5f * (R800_avg - R680_avg) / (R800_avg + 6.0f * R680_avg - 7.5f * R450_avg + 1.0f);
+
+
+  ARVI_pxl = (R800 - (2.0f * R680 - R450)) / (R800 + (2.0f * R680 - R450));
+  ARVI=ARVI_pxl.avg();
+  ARVI@long_name="Atmospherically Resistant Vegetation Index [Kaufman and Tanré (1996)]";
+  if(flg_abr)
+    ARVI@abr=(R800_avg - (2.0f * R680_avg - R450_avg)) / (R800_avg + (2.0f * R680_avg - R450_avg));
+
+  eta = (2.0f * ( sqr(R800) - sqr(R680)) + 1.5f * R800 + 0.5f * R680) / (R800 + R680 + 0.5f);
+  if(flg_abr)
+    eta_avg=(2.0f * (sqr(R800_avg) - sqr(R680_avg)) + 1.5f * R800_avg + 0.5f * R680_avg) / (R800_avg + R680_avg + 0.5f);
+
+  GEMI_pxl = (eta * (1.0f - 0.25f * eta)) - ((R680 - 0.125f) / (1.0f - R680));
+  GEMI=GEMI_pxl.avg();
+  GEMI@long_name="Global Environmental Monitoring Index [Pinty and Verstraete (1992)]";
+  if(flg_abr)
+    GEMI@abr= (eta_avg * (1.0f - 0.25f * eta_avg)) - ((R680_avg - 0.125f) / (1.0f - R680_avg));
+  
+  GARI_pxl = (R800 - (R550 - 1.7f * (R450 - R680))) / (R800 + (R550 - 1.7f * (R450 - R680)));
+  GARI=GARI_pxl.avg();
+  GARI@long_name="Green Atmospherically Resistant Index [Gitelson et al. (1996)]";
+  if(flg_abr)
+     GARI@abr= (R800_avg - (R550_avg - 1.7f * (R450_avg - R680_avg))) / (R800_avg + (R550_avg - 1.7f * (R450_avg - R680_avg)));
+
+  DVI_pxl = R800 - R680;
+  DVI=DVI_pxl.avg();
+  DVI@long_name="Difference Vegetation Index [Tucker et al. (1979)]";
+  if(flg_abr)
+      DVI@abr = R800_avg - R680_avg;
+
+  GDVI_pxl = R800 - R550;
+  GDVI=GDVI_pxl.avg();
+  GDVI@long_name="Green Difference Vegetation Index [Sripada et al. (2006)]";
+  if(flg_abr)
+      GDVI@abr = R800_avg - R550_avg;
+
+  
+  GNDVI_pxl = (R800 - R550) / (R800 + R550);
+  GNDVI=GNDVI_pxl.avg();
+  GNDVI@long_name="Green Normalized Difference Vegetation Index [Gitelson and Merzlyak (1998)]";
+  if(flg_abr)
+      GNDVI@abr = (R800_avg - R550_avg) / (R800_avg + R550_avg);
+
+  GRVI_pxl = R800 / R550;
+  GRVI=GRVI_pxl.avg();
+  GRVI@long_name="Green Ratio Vegetation Index [Sripada et al. (2006)]";
+  if(flg_abr)
+      GRVI@abr = R800_avg / R550_avg;
+
+
+  IPVI_pxl = R800 / (R800 + R680);
+  IPVI=IPVI_pxl.avg();
+  IPVI@long_name="Infrared Percentage Vegetation Index [Crippen et al. (1990)]";
+  if(flg_abr)
+    IPVI@abr=R800_avg / (R800_avg + R680_avg);
+
+  
+  LAI_pxl = 3.618f * ((2.5f * (R800 - R680)) / (R800 + 6.0f * R680 - 7.5f * R450 + 1.0f)) - 0.118f;
+  LAI=LAI_pxl.avg();
+  LAI@long_name="Leaf Area Index [Boegh et al. (2002)]";
+  if(flg_abr)
+    LAI@abr=3.618f * ((2.5f * (R800_avg - R680_avg)) / (R800_avg + 6.0f * R680_avg - 7.5f * R450_avg + 1.0f)) - 0.118f;
+
+  
+   
+  MSR_pxl = ((R800 / R680) - 1.0f) / (sqrt(R800 / R680) + 1);
+  MSR=MSR_pxl.avg();
+  MSR@long_name="Modified Simple Ratio [Chen et al. (1996)]";
+  if(flg_abr)
+    MSR@abr=((R800_avg / R680_avg) - 1.0f) / (sqrt(R800_avg / R680_avg) + 1);
+
+  NLI_pxl = (sqr(R800) - R680) / (sqr(R800) + R680);
+  NLI=NLI_pxl.avg();
+  NLI@long_name="Non-Linear Index [Goel and Qin (1994)]";
+  if(flg_abr)
+    NLI@abr=(sqr(R800_avg) - R680_avg) / (sqr(R800_avg) + R680_avg);
+
+  
+  MNLI_pxl = ((pow(R800, 2) - R680) * 1.5f) / (pow(R800, 2) + R680 + 0.5f);
+  MNLI=MNLI_pxl.avg();
+  MNLI@long_name="Modified Non-Linear Index [Yang et al. (2008)]";
+  if(flg_abr)
+    MNLI@abr=((sqr(R800_avg) - R680_avg) * 1.5f) / (sqr(R800_avg) + R680_avg + 0.5f);
+
+  
+  SAVI_pxl = (1.5f * (R800 - R680)) / (R800 + R680 + 0.5f);
+  SAVI=SAVI_pxl.avg();
+  SAVI@long_name="Soil Adjusted Vegetation Index [Huete et al. (1988)]";
+  if(flg_abr)
+     SAVI@abr = (1.5f * (R800_avg - R680_avg)) / (R800_avg + R680_avg + 0.5f);  
+
+  
+  TDVI_pxl = sqrt(0.5f + ((R800 - R680) / (R800 + R680)));
+  TDVI=TDVI_pxl.avg();
+  TDVI@long_name="Transformed Difference Vegetation Index [Bannari et al. (2002)]";
+  if(flg_abr)
+      TDVI@abr = sqrt(0.5f + ((R800_avg - R680_avg) / (R800_avg + R680_avg)));
+
+  
+  VARI_pxl = (R550 - R680) / (R550 + R680 - R450);
+  VARI=VARI_pxl.avg();
+  VARI@long_name="Visible Atmospherically Resistant Index [Gitelson et al. (2002)]";
+  if(flg_abr)
+      VARI@abr = (R550_avg - R680_avg) / (R550_avg + R680_avg - R450_avg);
+
+ }
+
+
+
+  // LemnaTec: Narrowband Greenness Indices
+if(flg_ngi){
+
+
+  RENDVI_pxl = (R750 - R705) / (R750 + R705);
+  RENDVI=RENDVI_pxl.avg();
+  RENDVI@long_name="Red Edge Normalized Difference Vegetation Index [Gitelson and Merzlyak (1994)]";
+  if(flg_abr)
+      RENDVI@abr = (R750_avg - R705_avg) / (R750_avg + R705_avg);
+
+  mRESR_pxl = (R750 - R445) / (R750 + R445);
+  mRESR=mRESR_pxl.avg();
+  mRESR@long_name="Modified Red Edge Simple Ratio Index [Sims and Gamon (2002)]";
+  if(flg_abr)
+     mRESR@abr= (R750_avg - R445_avg) / (R750_avg + R445_avg);
+
+  mRENDVI_pxl = (R750 - R705) / (R750 + R705 - 2.0f * R445);
+  mRENDVI=mRENDVI_pxl.avg();
+  mRENDVI@long_name="Modified Red Edge Normalized Difference Vegetation Index [Sims and Gamon (2002)]";
+  if(flg_abr)
+     mRENDVI@abr=(R750_avg - R705_avg) / (R750_avg + R705_avg - 2.0f * R445_avg);
+
+
+  VOG1_pxl = R740 / R720;
+  VOG1=VOG1_pxl.avg();
+  VOG1@long_name="Vogelmann Red Edge Index 1 [Vogelmann et al. (1993)]";
+  if(flg_abr)
+      R740_avg / R720_avg;
+
+  VOG2_pxl= (R734 - R747) / (R715 + R726);
+  VOG2=VOG2_pxl.avg();
+  VOG2@long_name="Vogelmann Red Edge Index 2 [Vogelmann et al. (1993)]";
+  if(flg_abr)
+    VOG2@abr= (R734_avg - R747_avg) / (R715_avg + R726_avg);
+
+  VOG3_pxl = (R734 - R747) / (R715 + R720);
+  VOG3=VOG3_pxl.avg();
+  VOG3@long_name="Vogelmann Red Edge Index 3 [Vogelmann et al. (1993)]";
+  if(flg_abr)
+    VOG3@abr=(R734_avg - R747_avg) / (R715_avg + R720_avg);
+  
+  MCARI_pxl = ((R700 - R670) - 0.2f * (R700 - R550)) * (R700 / R670);
+  MCARI=MCARI_pxl.avg();
+  MCARI@long_name="Modified Chlorophyll Absorption Reflectance Index [Daughtry et al. (2000)]";
+  if(flg_abr)
+    MCARI@abr=((R700_avg - R670_avg) - 0.2f * (R700_avg - R550_avg)) * (R700_avg / R670_avg);
+
+  MCARI1_pxl = 1.2f * (2.5f * (R790 - R670) - 1.3f * (R790 - R550));
+  MCARI1=MCARI1_pxl.avg();
+  MCARI1@long_name="Modified Chlorophyll Absorption Reflectance Index Improved 1 [Haboudane et al. (2004)]";
+  if(flg_abr)
+     MCARI1@abr=1.2f * (2.5f * (R790_avg - R670_avg) - 1.3f * (R790_avg - R550_avg));
+
+   
+  MCARI2_pxl = (1.5f * (2.5f * (R800 - R670) - 1.3f * (R800 - R550))) / sqrt( sqr(2.0f * R800 + 1.0f) - 6.0f * R800 - 5.0f * sqrt(R670) - 0.5f);
+  MCARI2=MCARI2_pxl.avg();
+  MCARI2@long_name="Modified Chlorophyll Absorption Reflectance Index Improved 2 [Haboudane et al. (2004)]";
+  if(flg_abr)
+    MCARI2@abr=(1.5f * (2.5f * (R800_avg - R670_avg) - 1.3f * (R800_avg - R550_avg))) / sqrt( sqr(2.0f * R800_avg + 1.0f) - 6.0f * R800_avg - 5.0f * sqrt(R670_avg) - 0.5f);
+
+  
+  MTVI_pxl = 1.2f * (1.2f * (R800 - R550) - 2.5f * (R670 - R550));
+  MTVI=MTVI_pxl.avg();
+  MTVI@long_name="Modified Triangular Vegetation Index [Haboudane et al. (2004)]";
+  if(flg_abr)
+      MTVI@abr = 1.2f * (1.2f * (R800_avg - R550_avg) - 2.5f * (R670_avg - R550_avg));
+
+  MTVI2_pxl = 1.5f * (1.2f * (R800 - R550) - 2.5f * (R670 - R550)) / sqrt( sqr(2.0f * R800 + 1.0f) - (6.0f * R800 - 5.0f * sqrt(R670)) - 0.5f);
+  MTVI2=MTVI2_pxl.avg();
+  MTVI2@long_name="Modified Triangular Vegetation Index Improved [Haboudane et al. (2004)]";
+  if(flg_abr)
+    MTVI2@abr = 1.5f * (1.2f * (R800_avg - R550_avg) - 2.5f * (R670_avg - R550_avg)) / sqrt(  sqr(2.0f * R800_avg + 1.0f) - (6.0f * R800_avg - 5.0f * sqrt(R670_avg)) - 0.5f);
+
+  
+  GMI1_pxl = R750 / R550;
+  GMI1=GMI1_pxl.avg();
+  GMI1@long_name="Gitelson and Merzlak Index 1 [Gitelson and Merzlak (1997)]";
+  if(flg_abr)
+      GMI1@abr = R750_avg / R550_avg;
+
+
+  GMI2_pxl = R750 / R700;
+  GMI2=GMI2_pxl.avg();
+  GMI2@long_name="Gitelson and Merzlak Index 2 [Gitelson and Merzlak (1997)]";
+  if(flg_abr)
+     GMI2@abr = R750_avg / R700_avg;
+
+   
+  G_pxl = R554 / R677;
+  G=G_pxl.avg();
+  G@long_name="Greenness Index";
+  if(flg_abr)
+      G@abr = R554_avg / R677_avg;
+
+  
+  Lic1_pxl = (R790 - R680) / (R790 + R680);
+  Lic1=Lic1_pxl.avg();
+  Lic1@long_name="Lichtenthaler Index 1 [Lichtenthaler et al. 1996]";
+  if(flg_abr)
+     Lic1@abr = (R790_avg - R680_avg) / (R790_avg + R680_avg);
+
+  
+  Lic2_pxl = R440 / R690;
+  Lic2=Lic2_pxl.avg();
+  Lic2@long_name="Lichtenthaler Index 2 [Lichtenthaler et al. 1996]";
+  if(flg_abr)
+     Lic2@abr = R440_avg / R690_avg;
+
+
+  Lic3_pxl = R440 / R740;
+  Lic3_=Lic3_pxl.avg();
+  Lic3@long_name="Lichtenthaler Index 3 [Lichtenthaler et al. 1996]";
+  if(flg_abr)
+      Lic3@abr = R440_avg / R740_avg;
+
+  // LemnaTec: Light Use Efficiency Indices
+  PRI_pxl = (R531 - R570) / (R531 + R570);
+  PRI=PRI_pxl.avg();
+  PRI@long_name="Photochemical Reflectance Index [Gamon et al. (1992)]";
+  if(flg_abr)
+      PRI@abr = (R531_avg - R570_avg) / (R531_avg + R570_avg);
+  
+
+ }
+
+// LemnaTec: Canopy Nitrogen Indices
+if(flg_cni){
+
+  
+  NDNI_pxl = (log(1.0f / R1510) - log(1.0f / R1680)) / (log(1.0f / R1510) + log(1.0f / R1680));
+  NDNI=NDNI_pxl.avg();
+  NDNI@long_name="Normalized Difference Nitrogen Index [Fourty et al. (1996)]";
+  if(flg_abr)
+     NDNI@abr = (log(1.0f / R1510_avg) - log(1.0f / R1680_avg)) / (log(1.0f / R1510_avg) + log(1.0f / R1680_avg));
+
+  
+  NRI1510_pxl = (R1510 - R660) / (R1510 + R660);
+  NRI1510=NRI1510_pxl.avg();
+  NRI1510@long_name="Nitrogen Related Index NRI1510 [Herrmann et al. (2009)]";
+  if(flg_abr)
+      NRI1510@abr = (R1510_avg - R660_avg) / (R1510_avg + R660_avg);
+  
+  NRI850_pxl = (R850 - R660) / (R850 + R660);
+  NRI850=NRI850_pxl.avg();
+  NRI850@long_name="Nitrogen Related Index NRI850 [Behrens et al. (2006)]";
+  if(flg_abr)
+    NRI850@abr = (R850_avg - R660_avg) / (R850_avg + R660_avg);
+ }
+
+
+
+// LemnaTec: Dry or Senescent Carbon Indices
+if(flg_sci){
+
+  
+  NDLI_pxl = (log(1.0f / R1754) - log(1.0f / R1680)) / (log(1.0f / R1754) + log(1.0f / R1680));
+  NDLI=NDLI_pxl.avg();
+  NDLI@long_name="Normalized Difference Lignin Index [Melillo et al. (1982)]";
+  if(flg_abr)
+     NDLI@abr = (log(1.0f / R1754_avg) - log(1.0f / R1680_avg)) / (log(1.0f / R1754_avg) + log(1.0f / R1680_avg));
+
+  
+  CAI_pxl = (0.5 * (R2000 - R2200)) / R2100;
+  CAI=CAI_pxl.avg();
+  CAI@long_name="Cellulose Absorption Index [Daughtry et al. (2001)]";
+  if(flg_abr)
+    CAI@abr = (0.5 * (R2000_avg - R2200_avg)) / R2100_avg;
+
+
+  PSRI_pxl = (R680 - R500) / R750;
+  PSRI=PSRI_pxl.avg();
+  PSRI@long_name="Plant Senescence Reflectance Index [Merzlyak et al. (1999)]";
+  if(flg_abr)
+     PSRI@abr = (R680_avg - R500_avg) / R750_avg;
+
+
+ }
+
+
+// LemnaTec: Leaf Pigments Indices
+if(flg_lpi){
+  CRI1_pxl = 1.0f / R510 - 1.0f / R550;
+  CRI1=CRI1_pxl.avg();
+  CRI1@long_name="Carotenoid Reflectance Index 1 [Gitelson et al. (2002)]";
+  if(flg_abr)
+    CRI@abr= 1.0f / R510_avg - 1.0f / R550_avg;
+
+   
+  CRI2_pxl = 1.0f / R510 - 1.0f / R700;
+  CRI2=CRI2_pxl.avg();
+  CRI2@long_name="Carotenoid Reflectance Index 2 [Gitelson et al. (2002)]";
+  if(flg_abr)
+    CRI2@abr = 1.0f / R510_avg - 1.0f / R700_avg;
+
+  
+  ARI1_pxl = 1.0f / R550 - 1.0f / R700;
+  ARI1=ARI1_pxl.avg();
+  ARI1@long_name="Anthocyanin Reflectance Index 1 [Gitelson et al. (2001)]";
+  if(flg_abr)
+    ARI1@abr = 1.0f / R550_avg - 1.0f / R700_avg;
+
+   
+  ARI2_pxl = R800 * ((1.0f / R550) - (1.0f / R700));
+  ARI2=ARI2_pxl.avg();
+  ARI2@long_name="Anthocyanin Reflectance Index 2 [Gitelson et al. (2001)]";
+  if(flg_abr)
+    ARI2@abr = R800_avg * ((1.0f / R550_avg) - (1.0f / R700_avg));
+
+  SRPI_pxl = R430 / R680;
+  SRPI=SRPI_pxl.avg();
+  SRPI@long_name="Simple Ration Pigment Index [Penuelas et al. (1995)]";
+  if(flg_abr)
+    SRPI@abr = R430_avg / R680_avg;
+
+  
+  NPQI_pxl = (R415 - R435) / (R415 + R435);
+  NPQI=NPQI_pxl.avg();
+  NPQI@long_name="Normalized Phaeophytinization Index [Barnes et al. (1992)]";
+  if(flg_abr)
+    NPQI@abr = (R415_avg - R435_avg) / (R415_avg + R435_avg);
+
+  NPCI_pxl = (R680 - R430) / (R680 + R430);
+  NPCI=NPCI_pxl.avg();
+  NPCI@long_name="Normalized Pigment Chlorophyll Index [Penuelas et al. (1994)]";
+  if(flg_abr)
+      NPCI@abr = (R680_avg - R430_avg) / (R680_avg + R430_avg);
+ }
+
+
+// LemnaTec: Canopy Water Content Indices
+if(flg_cwci){
+  
+  WBI_pxl = R900 / R970;
+  WBI=WBI_pxl.avg();
+  WBI@long_name="Water Band Index [Penuelas et al. (1995)]";
+  if(flg_abr)
+    WBI@abr = R900_avg / R970_avg;
+
+  
+  NDWI_pxl = (R857 - R1241) / ( R700 + R1241);
+  NDWI=NDWI_pxl.avg();
+  NDWI@long_name="Normalized Difference Water Index [Gao et al. (1995)]";
+  if(flg_abr)
+    NDWI@abr = (R857_avg - R1241_avg) / ( R700_avg + R1241_avg);
+
+ 
+  MSI_pxl = R819 / R1599;
+  MSI=MSI_pxl.avg();
+  MSI@long_name="Moisture Stress Index [Hunt and Rock (1989)]";
+  if(flg_abr)
+    MSI@abr = R819_avg / R1599_avg;
+
+  
+  NDII_pxl = (R857 - R1241) / ( R700 + R1241);
+  NDII=NDII_pxl.avg();
+  NDII@long_name="Normalized Difference Infrared Index [Hardisky et al. (1983)]";
+  if(flg_abr)
+    NDII@abr = (R857_avg - R1241_avg) / ( R700_avg + R1241_avg);
+ 
+  
+  NMDI_pxl = (R819 - R1649) / (R819 + R1649);
+  NMDI=NMDI_pxl.avg();
+  NMDI@long_name="Normalized Multiband Drought Index [Wang and Qu (2007)]";
+  if(flg_abr)
+    NMDI@abr = (R819_avg - R1649_avg) / (R819_avg + R1649_avg);
+
+ }
+
+// LemnaTec: Spectral Disease Indices
+if(flg_sdi){
+  HI_pxl = ((R534 - R698) / (R534 + R698)) - (R704 / 2.0f);
+  HI=HI_pxl.avg();
+  HI@long_name="Healthy Index [Mahlein et al. (2013)]";
+  if(flg_abr)
+    HI@abr = ((R534_avg - R698_avg) / (R534_avg + R698_avg)) - (R704_avg / 2.0f);
+
+
+  CLSI_pxl = ((R698 - R570) / (R698 + R570)) - R734;
+  CLSI=CLSI_pxl.avg();
+  CLSI@long_name="Cercospora Leaf Spot Index [Mahlein et al. (2013)]";
+  if(flg_abr)
+    CLSI@abr = ((R698_avg - R570_avg) / (R698_avg + R570_avg)) - R734_avg;
+
+  
+  SBRI_pxl = ((R570 - R513) / (R570 + R513)) + (R704 / 2.0f);
+  SBRI=SBRI_pxl.avg();
+  SBRI@long_name="Sugar Beet Rust Index [Mahlein et al. (2013)]";
+  if(flg_abr)
+    SBRI@abr = ((R570_avg - R513_avg) / (R570_avg + R513_avg)) + (R704_avg / 2.0f);
+
+  PMI_pxl = ((R520 - R584) / (R520 + R584)) + R724;
+  PMI=PMI_pxl.avg();
+  PMI@long_name="Powdery Mildew Index [Mahlein et al. (2013)]";
+  if(flg_abr)
+    PMI@abr = ((R520_avg - R584_avg) / (R520_avg + R584_avg)) + R724_avg;
+
+}
+
+// LemnaTec: Disease Water Stress Indices
+if(flg_dwsi){
+  
+  DWSI1_pxl = R800 / R1660;
+  DWSI1=DWSI1_pxl.avg();
+  DWSI1@long_name="Disease Water Stress Index 1 [Apan, Held, Phinn and Markley (2003)]";
+  if(flg_abr)
+    DWSI1@abr = R800_avg / R1660_avg;
+
+  DWSI2_pxl = R1660 / R550;
+  DWSI2=DWSI2_pxl.avg();
+  DWSI2@long_name="Disease Water Stress Index 2 [Apan, Held, Phinn and Markley (2003)]";
+  if(flg_abr)
+    DWSI2@abr = R1660_avg / R550_avg;
+ 
+  DWSI3_pxl = R1660 / R680;
+  DWSI3=DWSI3_pxl.avg();
+  DWSI3@long_name="Disease Water Stress Index 3 [Apan, Held, Phinn and Markley (2003)]";
+  if(flg_abr)
+    DWSI3@abr = R1660_avg / R680_avg;
+
+  
+  DWSI4_pxl = R550 / R680;
+  DWSI4DWSI4_pxl.avg();
+  DWSI4@long_name="Disease Water Stress Index 4 [Apan, Held, Phinn and Markley (2003)]";
+  if(flg_abr)
+     DWSI4@abr = R550_avg / R680_avg;
+
+  DWSI5_pxl = (R800 + R550) / (R1660 + R680);
+  DWSI5=DWSI5_pxl.avg();
+  DWSI5@long_name="Disease Water Stress Index 5 [Apan, Held, Phinn and Markley (2003)]";
+  DWSI5@abr = (R800_avg + R550_avg) / (R1660_avg + R680_avg);
+ }
+
+// LemnaTec: Misc Indices + Stress Detection Indices
+if(flg_mi){
+  
+   
+  Crt1_pxl = R695 / R420;
+  Crt1=Crt1_pxl.avg();
+  CRT1@long_name="Carter Index 1 [Carter (1994)]";
+  if(flg_abr)
+     Crt1@avg = R695_avg / R420_avg;
+
+  
+  Crt2_pxl = R695 / R760;
+  Crt2=Crt2_pxl.avg();
+  Crt2@long_name="Carter Index 2 [Carter (1996)]";
+  if(flg_abr)
+    Crt2@abr = R695_avg / R760_avg;
+
+
+  BIG2_pxl = R450 / R550;
+  BIG2=BIG2_pxl.avg();
+  BIG2@long_name="Blue/Green Index [Zarco-Tejada et al. (2005)]";
+  if(flg_abr)
+    BIG2@abr = R450_avg / R550_avg;
+  
+  /*  
+  LSI_pxl = R1110 / R810;
+  LSI=LSI_pxl.avg();
+  LSI@long_name="Leaf Structure Index [Maruthi Sridhar et al. (2007)]";
+  if(flg_abr)
+       LSI@abr = R1110_avg / R810_avg; 
+  */
+ 
+  BRI_pxl = ((1.0f / R550) - (1.0f / R700)) / R800;
+  BRI=BRI_pxl.avg();
+  BRI@long_name="Browning Reflectance Index [Chivkunova et al. (2001)]";
+  if(flg_abr)
+     BRI@abr = ((1.0f / R550_avg) - (1.0f / R700_avg)) / R800_avg;
+
+}
 
-NDVI_px = ( R900 -R680) / (R900+R680 );
-NDVI@long_name="Normalized Difference Vegetation Index";
-NDVI@standard_name="normalized_difference_vegetation_index";
-NDVI@description="Normalized Difference Vegetation Index | (R900-R680)/(R900+R680) | Rouse et al. (1973)";
-NDVI@notes="Normalized Difference Vegetation Index | NDVI";
-NDVI@units="ratio";
-NDV@label="Reflectance Index";
-NDVI@type="trait";
-NDVI_abr = ( R900_avg -R680_avg) / (R900_avg+R680_avg );
-NDVI_abr@long_name=NDVI@long_name;
-
-
-SR_px=R900 / R680;
-SR@long_name="Simple ratio";
-SR@standard_name="simple_ratio";
-SR@description="Simple ratio | R900 / R680 | Rouse et al. (1973)";
-SR@notes="Simple ratio | SR";
-SR@units="ratio";
-SR@label="Reflectance Index";
-SR@type="trait";
-SR_abr=R900_avg / R680_avg;
-SR_abr@long_name=SR@long_name;
-
-
-OSAVI_px=1.16f*( (R800-R670) ) /  ( R800+R670+0.16f);
-OSAVI@long_name="Optimized Soil-Adjusted Vegetation index";
-OSAVI@standard_name="optimized_soil-adjusted_vegetation_index";
-OSAVI@description="Optimized Soil-Adjusted Vegetation index | 1.16f*( (R800-R670) ) /  ( R800+R670+0.16f) | Rondeaux et al. (1996)";
-OSAVI@notes="Optimized Soil-Adjusted Vegetation index | OSAVI";
-OSAVI@units="ratio";
-OSAVI@label="Reflectance Index";
-OSAVI@type="trait";
-OSAVI_abr=1.16f*( (R800_avg-R670_avg) ) /  ( R800_avg+R670_avg+0.16f);
-OSAVI_abr@long_name=OSAVI@long_name;
-
-
-WI_px=R900-R970;
-WI@long_name="water index";
-WI@standard_name="water_index";
-WI@description="water index | R900-R970 | Penuelas. et al. (1993)";
-WI@notes="water index | WI";
-WI@units="ratio";
-WI@label="Reflectance Index";
-WI@type="trait";
-WI_abr=R900_avg-R970_avg;
-WI_abr@long_name=WI@long_name;
-
-
-CHL_px=R750 / R550;
-CHL@long_name="Chlorophyll index";
-CHL@standard_name="chlorophyll_index";
-CHL@description="Chlorophyll index | R750 / R550 | Gitelson and Merzlyak (1994)";
-CHL@notes="Chlorophyll index | CHL";
-CHL@units="ratio";
-CHL@label="Reflectance Index";
-CHL@type="trait";
-CHL_abr=R750_avg / R550_avg;
-CHL_abr@long_name=CHL@long_name;
-
-
-
-
-msR705_px= (R750-R445) / (R705-R445);
-msR705@long_name="Modified simple ratio 705";
-msR705@standard_name="modified_simple_ratio_705";
-msR705@description="Modified simple ratio 705 | (R750-R445) / (R705-R445) | Sims and Gamon (2002)";
-msR705@notes="Modified simple ratio 705 | msR705";
-msR705@units="ratio";
-msR705@label="Reflectance Index";
-msR705@type="trait";
-msR705_abr= (R750_avg-R445_avg) / (R705_avg-R445_avg);
-msR705_abr@long_name=msR705@long_name;
-
-
-TCARI_px=3.0f*(  (R700-R670)-0.2f * (R700-R550) * (R700/R670)  );
-TCARI@long_name="Transformed chlorophyll absorption in reflectance index";
-TCARI@standard_name="transformed_chlorophyll_absorption_in_reflectance_index";
-TCARI@description="Transformed chlorophyll absorption in reflectance index | 3.0f*(  (R700-R670)-0.2f * (R700-R550) * (R700/R670)  ) | Haboudane et al. (2002)";
-TCARI@notes="Transformed chlorophyll absorption in reflectance index | TCARI";
-TCARI@units="ratio";
-TCARI@label="Reflectance Index";
-TCARI@type="trait";
-TCARI_abr=3.0f*(  (R700_avg-R670_avg)-0.2f * (R700_avg-R550_avg) * (R700_avg/R670_avg)  );
-TCARI_abr@long_name=TCARI@long_name;
-
-
-
-CarChap_px=R760/R500;
-CarChap@long_name="Carotenoid index (Chappelle)";
-CarChap@standard_name="carotenoid_index_(chappelle)";
-CarChap@description="Carotenoid index (Chappelle) | R760/R500 | Chappelle et al. (1992)";
-CarChap@notes="Carotenoid index (Chappelle) | CarChap";
-CarChap@label="Reflectance Index";
-CarChap@type="trait";
-CarChap_abr=R760_avg/R500_avg;
-CarChap_abr@long_name=CarChap@long_name;
-
-
-Car1Black_px=R800/R470;
-Car1Black@long_name="Carotenoid index (BlackBurn)";
-Car1Black@standard_name="carotenoid_index_(blackburn)";
-Car1Black@description="Carotenoid index (BlackBurn) | R800/R470 | Blackburn (1998)";
-Car1Black@notes="Carotenoid index (BlackBurn) | Car1Black";
-Car1Black@units="ratio";
-Car1Black@label="Reflectance Index";
-Car1Black@type="trait";
-
-Car1Black_abr=R800_avg/R470_avg;
-Car1Black_abr@long_name=Car1Black@long_name;
-
-
-
-Car2Black_px= ( R800 - R470 ) / (R800 + R470);
-Car2Black@long_name="Carotenoid index 2 (BlackBurn)";
-Car2Black@standard_name="carotenoid_index_2_(blackBurn)";
-Car2Black@description="Carotenoid index 2 (BlackBurn) | ( R800 - R470 ) / (R800 + R470) | Blackburn (1998)";
-Car2Black@notes="Carotenoid index 2 (BlackBurn) | Car2Black";
-Car2Black@units="ratio";
-Car2Black@label="Reflectance Index";
-Car2Black@type="trait";
-Car2Black_abr= ( R800_avg - R470_avg ) / (R800_avg + R470_avg);
-Car2Black_abr@long_name=Car2Black@long_name;
-
-
-
-PRI570_px = (R531 - R570) / (R531+R570);
-PRI570@long_name="Photochemical reflectance index (570)";
-PRI570@standard_name="photochemical_reflectance_index_(570)";
-PRI570@description="Photochemical reflectance index (570) | (R531 - R570) / (R531+R570) | Gamon et al. (1992)";
-PRI570@notes="Photochemical reflectance index (570) | PRI570";
-PRI570@units="ratio";
-PRI570@label="Reflectance Index";
-PRI570@type="trait";
-PRI570_abr = (R531_avg - R570_avg) / (R531_avg+R570_avg);
-PRI570_abr@long_name=PRI570@long_name;
-
-
-SIPI_px =( R800 - R450) / (R800 + R650);
-SIPI@long_name="Structure intensive pigment index";
-SIPI@standard_name="structure_intensive_pigment_index";
-SIPI@description="Structure intensive pigment index | ( R800 - R450) / (R800 + R650) | Penuelas. et al. (1995)";
-SIPI@notes="Structure intensive pigment index | SIPI";
-SIPI@units="ratio";
-SIPI@label="Reflectance Index";
-SIPI@type="trait";
-SIPI_abr =( R800_avg - R450_avg) / (R800_avg + R650_avg);
-SIPI_abr@long_name=SIPI@long_name;
-
-
-
-antGamon_px=R650/R550;
-antGamon@long_name="Anthocyanin (Gamon)";
-antGamon@standard_name="anthocyanin_(gamon)";
-antGamon@description="Anthocyanin (Gamon) | R650/R550 | Gamon and Surfus (1999)";
-antGamon@notes="Anthocyanin (Gamon) | antGamon";
-antGamon@units="ratio";
-antGamon@label="Reflectance Index";
-antGamon@type="trait";
-
-antGamon_abr=R650_avg/R550_avg;
-antGamon_abr@long_name=antGamon@long_name;
-
-
-
-antGitelson_px=( 1.0f/R550 - 1.0f/R700)*R780;
-antGitelson@long_name="Anthocyanin (Gitelson)";
-antGitelson@standard_name="anthocyanin_(gitelson)";
-antGitelson@description="Anthocyanin (Gitelson) | ( 1.0f/R550 - 1.0f/R700)*R780 | Gitelson et al.(2003,2006)";
-antGitelson@notes="Anthocyanin (Gitelson) | antGitelson";
-antGitelson@units="ratio";
-antGitelson@label="Reflectance Index";
-antGitelson@type="trait";
-antGitelson_abr=( 1.0f/R550_avg - 1.0f/R700_avg)*R780_avg;
-antGitelson_abr@long_name=antGitelson@long_name;
-
-
-CHLDela_px=( R540-R590 ) / ( R540 + R590);
-CHLDela@long_name="Chlorophyll content";
-CHLDela@standard_name="chlorophyll_content";
-CHLDela@description="Chlorophyll content | ( R540-R590 ) / ( R540 + R590) | Delaieux et al. (2014)";
-CHLDela@notes="Chlorophyll content | CHLDela";
-CHLDela@units="ratio";
-CHLDela@label="Reflectance Index";
-CHLDela@type="trait";
-CHLDela_abr=( R540_avg-R590_avg ) / ( R540_avg + R590_avg);
-CHLDela_abr@long_name=CHLDela@long_name;
-
-
-
-CI_px=( R750-R705 ) / ( R750 + R705);
-CI@long_name="Chlorophyll index";
-CI@standard_name="chlorophyll_index";
-CI@description="Chlorophyll index | ( R750-R705 ) / ( R750 + R705) | Gitelson and Merzlyak (1994)";
-CI@notes="Chlorophyll index | CI";
-CI@units="ratio";
-CI@label="Reflectance Index";
-CI@type="trait";
-CI_abr=( R750_avg-R705_avg ) / ( R750_avg + R705_avg);
-CI_abr@long_name=CI@long_name;
-
-
-
-PRI586_px=( R531-R586) / ( R531 + R586);
-PRI586@long_name="Photochemical reflectance index (586)";
-PRI586@standard_name="photochemical_reflectance_index_(586)";
-PRI586@description="Photochemical reflectance index (586) | ( R531-R586) / ( R531 + R586) | Panigada et al. (2014)";
-PRI586@notes="Photochemical reflectance index (586) | PRI586";
-PRI586@units="ratio";
-PRI586@label="Reflectance Index";
-PRI586@type="trait";
-PRI586_abr=( R531_avg-R586_avg) / ( R531_avg + R586_avg);
-PRI586_abr@long_name=PRI586@long_name;
-
-
-
-PRI512_px=( R531-R512) / ( R531 + R512);
-PRI512@long_name="Photochemical reflectance index (512)";
-PRI512@standard_name="photochemical_reflectance_index_(512)";
-PRI512@description="Photochemical reflectance index (512) | ( R531-R512) / ( R531 + R512) | Hernández-Clemente et al. (2011)";
-PRI512@notes="Photochemical reflectance index (512) | PRI512";
-PRI512@units="ratio";
-PRI512@label="Reflectance Index";
-PRI512@type="trait";
-PRI512_abr=( R531_avg-R512_avg) / ( R531_avg + R512_avg);
-PRI512_abr@long_name=PRI512@long_name;
-
-
-FRI1_px=R690 / R600;
-FRI1@long_name="Fluorescence ratio index1";
-FRI1@standard_name="fluorescence_ratio_index1";
-FRI1@description="Fluorescence ratio index1 | R690 / R600 | Dobrowski et al. (2005)";
-FRI1@notes="Fluorescence ratio index1 | FRI1";
-FRI1@units="ratio";
-FRI1@label="Reflectance Index";
-FRI1@type="trait";
-FRI1_abr=R690_avg / R600_avg;
-FRI1_abr@long_name=FRI1@long_name;
-
-
-
-FRI2_px=R740 / R800;
-FRI2@long_name="Fluorescence ratio indices 2";
-FRI2@standard_name="fluorescence_ratio_indices_2";
-FRI2@description="Fluorescence ratio indices 2 | R740 / R800 | Dobrowski et al. (2005)";
-FRI2@notes="Fluorescence ratio indices 2 | FRI2";
-FRI2@units="ratio";
-FRI2@label="Reflectance Index";
-FRI2@type="trait";
-FRI2_abr=R740_avg / R800_avg;
-FRI2_abr@long_name=FRI2@long_name;
-
-
-NDVI1_px=(R800-R670)/ (R800+R670);
-NDVI1@long_name="Normalized Difference Vegetation Index1";
-NDVI1@standard_name="normalized_difference_vegetation_index1";
-NDVI1@description="Normalized Difference Vegetation Index1 | (R800-R670)/ (R800+R670) | Rouse et al. (1973)";
-NDVI1@notes="Normalized Difference Vegetation Index1 | NDVI1";
-NDVI1@units="ratio";
-NDVI1@label="Reflectance Index";
-NDVI1@type="trait";
-NDVI1_abr=(R800_avg-R670_avg)/ (R800_avg+R670_avg);
-NDVI1_abr@long_name=NDVI1@long_name;
-
-
-RDVI_px=NDVI1_px*0.5f;
-RDVI@long_name="Renormalized Difference Vegetation Index";
-RDVI@standard_name="renormalized_difference_vegetation_index";
-RDVI@description="Renormalized Difference Vegetation Index | NDVI1*0.5f | Rougean and Breon (1995)";
-RDVI@notes="Renormalized Difference Vegetation Index | RDVI";
-RDVI@units="ratio";
-RDVI@label="Reflectance Index";
-RDVI@type="trait";
-RDVI_abr=NDVI1_abr*0.5f;
-RDVI_abr@long_name=RDVI@long_name;
-
-
-RERI_px=R700/R670;
-RERI@long_name="Red edge ratio index";
-RERI@standard_name="red_edge_ratio_index";
-RERI@description="Red edge ratio index | R700/R670 | Part of TCARI index";
-RERI@notes="Red edge ratio index | RERI";
-RERI@units="ratio";
-RERI@label="Reflectance Index";
-RERI@type="trait";
-RERI_abr=R700_avg/R670_avg;
-RERI_abr@long_name=RERI@long_name;
-
-
-ZM_px= R750 / R710;
-ZM@long_name="Red edge";
-ZM@standard_name="red_edge";
-ZM@description="Red edge | R750 / R710 | Zarco-Tejada et al. (2001)";
-ZM@notes="Red edge | ZM";
-ZM@units="ratio";
-ZM@label="Reflectance Index";
-ZM@type="trait";
-ZM_abr= R750_avg / R710_avg;
-ZM_abr@long_name=ZM@long_name;
-
-
-REP_px=700.0f +40.0f*(((R670+R780)/2-R700) /(R740-R700));
-REP@long_name="Red edge position";
-REP@standard_name="red_edge_position";
-REP@description="Red edge position | 700.0f +40.0f*(((R670+R780)/2-R700) /(R740-R700)) | Guyot and Baret, 1988";
-REP@notes="Red edge position | REP";
-REP@units="ratio";
-REP@label="Reflectance Index";
-REP@type="trait";
-REP_abr=700.0f +40.0f*(((R670_avg+R780_avg)/2-R700_avg) /(R740_avg-R700_avg));
-REP_abr@long_name=REP@long_name;
-
-
-NDRE_px=(R790-R720)/(R790+R720);
-NDRE@long_name="Normalized difference vegetation index";
-NDRE@standard_name="normalized_difference_vegetation_index";
-NDRE@description="Normalized difference vegetation index | (R790-R720)/(R790+R720) | Barnes et al. (2000)";
-NDRE@notes="Normalized differenc vegetation index | NDRE";
-NDRE@units="ratio";
-NDRE@label="Reflectance Index";
-NDRE@type="trait";
-NDRE_abr=(R790_avg-R720_avg)/(R790_avg+R720_avg);
-NDRE_abr@long_name=NDRE@long_name;
-
-TVI_px=pow( 0.5f, (120.0f*(R750-R550)-200.0f*(R670-R550)));
-TVI@long_name="Triangular Vegetation Index";
-TVI@standard_name="triangular_vegetation_index";
-TVI@description="Triangular Vegetation Index | 0.5f**(120.0f*(R750-R550)-200.0f*(R670-R550))) | Haboudaneet al. (2004)";
-TVI@notes="Triangular Vegetation Index | TVI";
-TVI@units="ratio";
-TVI@label="Reflectance Index";
-TVI@type="trait";
-TVI_abr=pow( 0.5f, (120.0f*(R750_avg-R550_avg)-200.0f*(R670_avg-R550_avg)));
-TVI_abr@long_name=TVI@long_name;
+
+
+
+
+
+
+
 
 
 /* create avg from pixel formula 
- this creates the vars NDVI, SR, OSAVI by taking average of the vars NDVI_px, SR_px, OSAVI_px  
+ this creates the vars NDVI, SR, OSAVI by taking average of the vars NDVI_pxl, SR_pxl, OSAVI_pxl  
  and also min,max that is NDVI@min, NDVI@max, SR@min, SR@max, OSAVI@min, OSAVI@max ...,*/
 
-if(flg_px){ 
+if(flg_rba){ 
   /* nb sz and idx are already RAM vars */
 
-  @vars_abr=get_vars_out(".*_px");
+  @vars_abr=get_vars_out(".*_pxl");
   
   
   if(flg_dbg)
@@ -495,21 +1079,42 @@ if(flg_px){
  
   for(idx=0;idx<sz;idx++)   
   {
-    @name_px=sprint(@vars_abr(idx));
+    @name_pxl=sprint(@vars_abr(idx));
      // remove the _abr suffix with a negative index -yah
-     @name=@name_px(0:-4);
+     @name=@name_pxl(0:-5);
      @name_min=push(@name,"@min");
      @name_max=push(@name,"@max");
 
-     if(exists(*@name_px))
+     if(exists(*@name_pxl))
      {
        // average of ratio 
-       *@name=*@name_px.avg();
+       // *@name=*@name_pxl.avg();
        // min
-       *@name_min=*@name_px.min();    
+       *@name_min=*@name_pxl.min();    
        // max
-       *@name_max=*@name_px.max();    
+       *@name_max=*@name_pxl.max();    
 
      }  
   }  
 }  
+
+
+//do clean up of global -atts - aka vpointers
+if(exists(@rfl_lst))   ram_delete(@rfl_lst);
+if(exists(@dbl_val_lst)) ram_delete(@dbl_val_lst);
+if(exists(@ind_lst)) ram_delete(@ind_lst);
+if(exists(@R_nm)) ram_delete(@R_nm);
+if(exists(@iR_nm)) ram_delete(@iR_nm);
+
+if(exists(@var_nm)) ram_delete(@var_nm);
+if(exists(@var_inm)) ram_delete(@var_inm);
+if(exists(@var_nm_avg)) ram_delete(@var_nm_avg);
+
+
+
+if(exists(@vars_abr)) ram_delete(@vars_abr);
+if(exists(@name)) ram_delete(@name);
+if(exists(@name_pxl)) ram_delete(@name_pxl);
+if(exists(@name_min)) ram_delete(@name_min);
+if(exists(@name_max)) ram_delete(@name_max);
+
