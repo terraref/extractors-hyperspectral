@@ -41,7 +41,7 @@ if(!exists(flg_abr))
 
 if(!exists(flg_mss)){
   *flg_mss=1s;  // [flg] add and set _FillValue to reflectance indices
-  flt_mss=1.0e36f;
+  *flt_mss=1.0e36f;
 }
 
 if(!exists(flg_std))
@@ -77,11 +77,11 @@ if(!exists(flg_sdi))
 
 // March 2017 - this contains SWIR wavelengths -so default is OFF
 if(!exists(flg_dwsi))
-  *flg_dwsi=0s; // [flg] // Spectral Disease Indices
+  *flg_dwsi=0s; // [flg] Disease Water Stress Indices
 
-// March 2017 - this conains LSI that is commented out as it contains SWIR elements
+// March 2017 - this contains  LSI that is commented out as it contains SWIR elements
 if(!exists(flg_mi))
-  *flg_mi=1s; // [flg] // Spectral Disease Indices
+  *flg_mi=1s; // [flg] // Misc Indices + Stress Detection Indices
 
 
 
@@ -115,6 +115,8 @@ if( @rfl_lst.size() != @dbl_val_lst.size() )
   *idx=0;
   *sz=@rfl_lst.size();
 
+  print(@rfl_lst.size());
+   
   for(idx=0;idx<sz;idx++)
   {
     @R_nm=sprint(@rfl_lst(idx));
@@ -123,15 +125,14 @@ if( @rfl_lst.size() != @dbl_val_lst.size() )
     //*@iR_nm=min_coords(wavelength,@R_nbr);
     
     //print(@R_nbr);
-    *@iR_nm=min_coords(wavelength,@dbl_val_lst(idx));
-    
-          
-  }
 
-
+    // nb '**' create a RAM var from a var-pointer
+    **@iR_nm=min_coords(wavelength,@dbl_val_lst(idx));
+       
 }
 
 
+}
 
 /* sanity checks for required relectances -  make sure the are within reasonable tolerance (1.0e-9) */
 if( fabs(wavelength(iR445)-4.45e-7) > 0.01e-7d )  
@@ -169,7 +170,8 @@ if( fabs(wavelength(iR700)-7e-7) > 0.01e-7d )
     @var_nm_avg=push(@var_nm,"_avg");
 
     /* create R* variables from hyperslab */
-    *@var_nm=rfl_img(*@var_inm,:,:);
+    /* nb '**' means screate a RAM var from a var-pointer */
+    **@var_nm=rfl_img(*@var_inm,:,:);
    
 
     
@@ -563,22 +565,22 @@ if(flg_std){
 // LemnaTec: Broadband Greenness Indices
 if(flg_bgi){
 
-  EVI_pxl = 2.5 * (R800 - R680) / (R800 + 6.0f * R680 - 7.5f * R450 + 1.0f);
+  EVI_pxl = 2.5f * (R800 - R680) / (R800 + 6.0f * R680 - 7.5f * R450 + 1.0f);
   EVI=EVI_pxl.avg();
   EVI@long_name="Enhanced Vegetation Index [Huete et al. (1997)]";
   if(flg_abr)
-    EVI@abr= 2.5 * (R800_avg - R680_avg) / (R800_avg + 6.0f * R680_avg - 7.5f * R450_avg + 1.0f);
+    EVI@abr= 2.5f * (R800_avg - R680_avg) / (R800_avg + 6.0f * R680_avg - 7.5f * R450_avg + 1.0f);
 
 
   ARVI_pxl = (R800 - (2.0f * R680 - R450)) / (R800 + (2.0f * R680 - R450));
   ARVI=ARVI_pxl.avg();
   ARVI@long_name="Atmospherically Resistant Vegetation Index [Kaufman and Tanré (1996)]";
   if(flg_abr)
-   ARVI@abr=(R800_avg - (2.0f * R680_avg - R450_avg)) / (R800_avg + (2.0f * R680_avg - R450_avg));
+    ARVI@abr=(R800_avg - (2.0f * R680_avg - R450_avg)) / (R800_avg + (2.0f * R680_avg - R450_avg));
 
-  eta = (2.0f * (pow(R800,2) - pow(R680,2)) + 1.5f * R800 + 0.5f * R680) / (R800 + R680 + 0.5f);
+  eta = (2.0f * ( sqr(R800) - sqr(R680)) + 1.5f * R800 + 0.5f * R680) / (R800 + R680 + 0.5f);
   if(flg_abr)
-     eta_avg=(2.0f * (pow(R800_avg,2) - pow(R680_avg,2)) + 1.5f * R800_avg + 0.5f * R680_avg) / (R800_avg + R680_avg + 0.5f);
+    eta_avg=(2.0f * (sqr(R800_avg) - sqr(R680_avg)) + 1.5f * R800_avg + 0.5f * R680_avg) / (R800_avg + R680_avg + 0.5f);
 
   GEMI_pxl = (eta * (1.0f - 0.25f * eta)) - ((R680 - 0.125f) / (1.0f - R680));
   GEMI=GEMI_pxl.avg();
@@ -586,11 +588,11 @@ if(flg_bgi){
   if(flg_abr)
     GEMI@abr= (eta_avg * (1.0f - 0.25f * eta_avg)) - ((R680_avg - 0.125f) / (1.0f - R680_avg));
   
-  GARI_pxl = (R800 - (R550 - 1.7 * (R450 - R680))) / (R800 + (R550 - 1.7 * (R450 - R680)));
+  GARI_pxl = (R800 - (R550 - 1.7f * (R450 - R680))) / (R800 + (R550 - 1.7f * (R450 - R680)));
   GARI=GARI_pxl.avg();
   GARI@long_name="Green Atmospherically Resistant Index [Gitelson et al. (1996)]";
   if(flg_abr)
-     GARI@abr= (R800_avg - (R550_avg - 1.7 * (R450_avg - R680_avg))) / (R800_avg + (R550_avg - 1.7 * (R450_avg - R680_avg)));
+     GARI@abr= (R800_avg - (R550_avg - 1.7f * (R450_avg - R680_avg))) / (R800_avg + (R550_avg - 1.7f * (R450_avg - R680_avg)));
 
   DVI_pxl = R800 - R680;
   DVI=DVI_pxl.avg();
@@ -639,18 +641,18 @@ if(flg_bgi){
   if(flg_abr)
     MSR@abr=((R800_avg / R680_avg) - 1.0f) / (sqrt(R800_avg / R680_avg) + 1);
 
-  NLI_pxl = (pow(R800, 2) - R680) / (pow(R800, 2) + R680);
+  NLI_pxl = (sqr(R800) - R680) / (sqr(R800) + R680);
   NLI=NLI_pxl.avg();
   NLI@long_name="Non-Linear Index [Goel and Qin (1994)]";
   if(flg_abr)
-    NLI@abr=(pow(R800_avg, 2) - R680_avg) / (pow(R800_avg, 2) + R680_avg);
+    NLI@abr=(sqr(R800_avg) - R680_avg) / (sqr(R800_avg) + R680_avg);
 
   
   MNLI_pxl = ((pow(R800, 2) - R680) * 1.5f) / (pow(R800, 2) + R680 + 0.5f);
   MNLI=MNLI_pxl.avg();
   MNLI@long_name="Modified Non-Linear Index [Yang et al. (2008)]";
   if(flg_abr)
-     MNLI@abr=((pow(R800_avg, 2) - R680_avg) * 1.5f) / (pow(R800_avg, 2) + R680_avg + 0.5f);
+    MNLI@abr=((sqr(R800_avg) - R680_avg) * 1.5f) / (sqr(R800_avg) + R680_avg + 0.5f);
 
   
   SAVI_pxl = (1.5f * (R800 - R680)) / (R800 + R680 + 0.5f);
@@ -731,11 +733,11 @@ if(flg_ngi){
      MCARI1@abr=1.2f * (2.5f * (R790_avg - R670_avg) - 1.3f * (R790_avg - R550_avg));
 
    
-  MCARI2_pxl = (1.5f * (2.5f * (R800 - R670) - 1.3f * (R800 - R550))) / sqrt(pow(2.0f * R800 + 1.0f, 2) - 6.0f * R800 - 5.0f * sqrt(R670) - 0.5f);
+  MCARI2_pxl = (1.5f * (2.5f * (R800 - R670) - 1.3f * (R800 - R550))) / sqrt( sqr(2.0f * R800 + 1.0f) - 6.0f * R800 - 5.0f * sqrt(R670) - 0.5f);
   MCARI2=MCARI2_pxl.avg();
   MCARI2@long_name="Modified Chlorophyll Absorption Reflectance Index Improved 2 [Haboudane et al. (2004)]";
   if(flg_abr)
-    MCARI2@abr=(1.5f * (2.5f * (R800_avg - R670_avg) - 1.3f * (R800_avg - R550_avg))) / sqrt(pow(2.0f * R800_avg + 1.0f, 2) - 6.0f * R800_avg - 5.0f * sqrt(R670_avg) - 0.5f);
+    MCARI2@abr=(1.5f * (2.5f * (R800_avg - R670_avg) - 1.3f * (R800_avg - R550_avg))) / sqrt( sqr(2.0f * R800_avg + 1.0f) - 6.0f * R800_avg - 5.0f * sqrt(R670_avg) - 0.5f);
 
   
   MTVI_pxl = 1.2f * (1.2f * (R800 - R550) - 2.5f * (R670 - R550));
@@ -744,11 +746,11 @@ if(flg_ngi){
   if(flg_abr)
       MTVI@abr = 1.2f * (1.2f * (R800_avg - R550_avg) - 2.5f * (R670_avg - R550_avg));
 
-  MTVI2_pxl = 1.5f * (1.2f * (R800 - R550) - 2.5f * (R670 - R550)) / sqrt(pow(2.0f * R800 + 1.0f ,2) - (6.0f * R800 - 5.0f * sqrt(R670)) - 0.5f);
+  MTVI2_pxl = 1.5f * (1.2f * (R800 - R550) - 2.5f * (R670 - R550)) / sqrt( sqr(2.0f * R800 + 1.0f) - (6.0f * R800 - 5.0f * sqrt(R670)) - 0.5f);
   MTVI2=MTVI2_pxl.avg();
   MTVI2@long_name="Modified Triangular Vegetation Index Improved [Haboudane et al. (2004)]";
   if(flg_abr)
-      MTVI2@abr = 1.5f * (1.2f * (R800_avg - R550_avg) - 2.5f * (R670_avg - R550_avg)) / sqrt(pow(2.0f * R800_avg + 1.0f ,2) - (6.0f * R800_avg - 5.0f * sqrt(R670_avg)) - 0.5f);
+    MTVI2@abr = 1.5f * (1.2f * (R800_avg - R550_avg) - 2.5f * (R670_avg - R550_avg)) / sqrt(  sqr(2.0f * R800_avg + 1.0f) - (6.0f * R800_avg - 5.0f * sqrt(R670_avg)) - 0.5f);
 
   
   GMI1_pxl = R750 / R550;
