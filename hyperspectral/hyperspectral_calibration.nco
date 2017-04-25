@@ -22,7 +22,7 @@
 
 // Defaults for values not provided on command-line
 if(!exists(clb_nbr)) *clb_nbr=73; // [nbr] Calibration number
-if(!exists(drc_spt)) *drc_spt="."; // [sng] Script directory
+//if(!exists(drc_spt)) *drc_spt="."; // [sng] Script directory
 
 // Change hyperspectral camera wavelengths from nm to m (SI)
 wavelength*=1.0e-9; // [m]
