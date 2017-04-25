@@ -656,7 +656,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	drc_spt_att="@drc_spt='\"${drc_spt}\"'" 
 	# NCO_PATH environment variable required for hyperspectral_calibration.nco to find hyperspectral_spectralon_reflectance_factory.nco
 	export NCO_PATH="${drc_spt}"
-	cmd_clb[${fl_idx}]="ncap2 -A ${nco_opt} -s ${drc_spt_att} -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_in}"
+	cmd_clb[${fl_idx}]="ncap2 -A ${nco_opt} -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_in}"
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_clb[${fl_idx}]}
 	fi # !dbg
