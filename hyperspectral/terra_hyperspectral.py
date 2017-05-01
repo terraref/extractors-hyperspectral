@@ -157,8 +157,9 @@ class HyperspectralRaw2NetCDF(Extractor):
 		except:
 			date_portion = resource['dataset_info']['name']
 			timestamp_portion = ""
-		# TODO: Differentiate VNIR and SWIR here
-		outFilePath = os.path.join(self.output_dir,
+
+		outFilePath = os.path.join(self.output_dir + ("_swir" if resource['dataset_info']['name'].find("SWIR") > -1
+													  else ""),
 								   date_portion,
 								   timestamp_portion,
 								   get_output_filename(target_files['raw']['filename']))
