@@ -3,7 +3,9 @@
 import numpy as np
 import sys
 import json
-from datetime import date, datetime
+from math import *
+from datetime import date, datetime, timedelta
+from decimal import *
 
 # from Dr. LeBauer, Github thread: terraref/referece-data #32
 CAMERA_POSITION = np.array([1.9, 0.855, 0.635])
@@ -22,27 +24,103 @@ LATITUDE_TO_METER  = 1/ (25.906 * 3600) #varies, but has been corrected based on
 GOOGLE_MAP_TEMPLATE = "https://maps.googleapis.com/maps/api/staticmap?size=1280x720&zoom=17&path=color:0x0000005|weight:5|fillcolor:0xFFFF0033|{pointA}|{pointB}|{pointC}|{pointD}"
 
 
-def julian_date(time_string):
-    timeUnpack = datetime.strptime(time_string, "%m/%d/%Y %H:%M:%S").timetuple()
-    raise NotImplementedError
+def _julian_date(time_date):
+    '''
+    Calculate the Julian Date based on the input datetime object (should
+    be in Gregorian).
+    
+    Private in this module
 
+    Had already checked the output against the result from
+    United States Naval Observatory, Astronomical App Dept.
+    
+    Detail: http://aa.usno.navy.mil/data/docs/JulianDate.php
+    '''
+    a = floor((14-time_date.month)/12)
+    
+    if time_date.month in (1, 2):
+        assert a == 1
+    else:
+        assert a == 0
+        
+    years  = time_date.year + 4800 - a
+    months = time_date.month + 12 * a - 3
+    
+    if time_date.month == 3:
+        assert months == 0
+    elif time_date.month == 2:
+        assert months == 11
+    
+    getcontext().prec = 8
+    return time_date.day  + floor((153*months+2)/5) + 365*years +\
+           floor(years/4) - floor(years/100) + floor(years/400) - 32045 +\
+           float(Decimal(time_date.hour-12)/Decimal(24) + Decimal(time_date.minute)/Decimal(1440)+\
+           Decimal(time_date.second)/Decimal(86400))
+        
+        
+def solar_zenith_angle(time_date):
+    '''
+    Calculate the solar zenith angle based on the datetime object given
+    '''
+    
+    latitude  = Decimal(33)  + Decimal(4.47)   / Decimal(60)
+    longitude = Decimal(-111)- Decimal(58.485) / Decimal(60)
+    
+    getcontext().prec = 8
+    julian_date = _julian_date(time_date)
+    actural_day = Decimal(julian_date)
+    
+    ### Sun & Earth Data ###
+    long_perihelion = Decimal(282.9404) + Decimal(4.70935e-5) * actural_day
+    eccentricity    = Decimal(0.016709) - Decimal(1.151e-9)   * actural_day
+    anomaly_degree  = (Decimal(356.047) + Decimal(0.9856002585)*actural_day) % Decimal(360)
+    
+    sun_mean_long   = long_perihelion + anomaly_degree
+    sun_obliquity   = Decimal(23.4393)- Decimal(3.563e-7) * actural_day
+    auxiliary_angle = anomaly_degree + (Decimal(180)/Decimal(pi)) * eccentricity *\
+                      Decimal(sin(anomaly_degree*Decimal(pi)/Decimal(180))) *\
+                      (Decimal(1)+eccentricity*Decimal(cos(anomaly_degree*Decimal(pi)/Decimal(180))))
+            
+    x_rectan_coord  = Decimal(cos(auxiliary_angle*Decimal(pi/180))) - eccentricity
+    y_rectan_coord  = Decimal(sin(auxiliary_angle*Decimal(pi/180))) * Decimal(sqrt(float(Decimal(1)-\
+                      eccentricity**Decimal(2))))    
 
-def solar_zenith_angle(time_string):
-    raise NotImplementedError
-# from Dr. LeBauer, Github thread: terraref/referece-data #32
-# This matrix looks like this:
-#
-#     | alphaX, gamma, u0 |
-#     |			  |
-# A = |   0 ,  alphaY, v0 |
-#     |			  |
-#     |   0 ,    0,     1 |
-#
-# where alphaX = alphaY = CAMERA_FOCAL_LENGTH / PIXEL_PITCH,
-#       GAMMA is calibration constant
-#       u0 and v0 are the center coordinate of the image (waiting to be found)
-#
-# will be used in calculating the lat long of the image
+    distance        = Decimal(sqrt(float(x_rectan_coord**2+y_rectan_coord**2)))
+    true_anomaly    = Decimal(atan2(y_rectan_coord, x_rectan_coord))*Decimal(180/pi)
+    sun_longitude   = true_anomaly + long_perihelion
+    
+    x_ecliptic      = distance*Decimal(cos(sun_longitude*Decimal(pi/180)))
+    y_ecliptic      = distance*Decimal(sin(sun_longitude*Decimal(pi/180)))
+    z_ecliptic      = Decimal(0.0)
+    
+    x_equitorial    = x_ecliptic
+    y_equitorial    = y_ecliptic*Decimal(cos(sun_obliquity*Decimal(pi/180)))+\
+                      z_ecliptic*Decimal(sin(sun_obliquity*Decimal(pi/180)))
+    z_equitorial    = y_ecliptic*Decimal(sin(Decimal(23.4406)*Decimal(pi/180)))+\
+                      z_ecliptic*Decimal(cos(sun_obliquity*Decimal(pi/180)))
+    
+    distance        = (x_equitorial**2+y_equitorial**2+z_equitorial**2)**(1/2)
+    delta           = Decimal(asin(z_equitorial/distance))*Decimal(180/pi)
+    right_ascension = Decimal(atan2(y_equitorial, x_equitorial))*Decimal(180/pi)
+    
+    uth             = Decimal(time_date.hour)+Decimal(time_date.minute)/Decimal(60)+\
+                      Decimal(time_date.second)/Decimal(3600)
+    gmst            = ((sun_longitude+Decimal(180))%Decimal(360))/Decimal(15)
+    loc_sideral_t   = gmst + uth + longitude / Decimal(15)
+
+    ### Right Ascension to Hour Angle ###
+    hour_angle      = loc_sideral_t*Decimal(15) - right_ascension
+    
+    actural_x       = Decimal(cos(hour_angle*Decimal(pi/180)))*Decimal(cos(delta*Decimal(pi/180)))
+    actural_z       = Decimal(sin(delta*Decimal(pi/180)))
+    
+    x_rotation      = actural_x*Decimal(cos((Decimal(90)-latitude)*Decimal(pi)/Decimal(180)))-\
+                      actural_z*Decimal(sin((Decimal(90)-latitude)*Decimal(pi)/Decimal(180)))
+    z_rotation      = actural_x*Decimal(sin((Decimal(90)-latitude)*Decimal(pi/180)))+\
+                      actural_z*Decimal(cos((Decimal(90)-latitude)*Decimal(pi/180)))
+
+    ### Zenith Angle = 90 - Elevation Angle ###  
+    return 90 - abs(Decimal(asin(z_rotation))*Decimal(180/pi))
 
 
 def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption, downsampled=False):

@@ -81,9 +81,9 @@ import time
 import os
 import re
 import math
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from netCDF4 import Dataset, stringtochar
-from hyperspectral_calculation import pixel2Geographic, REFERENCE_POINT
+from hyperspectral_calculation import pixel2Geographic, solar_zenith_angle, REFERENCE_POINT
 
 _UNIT_DICTIONARY = {'m':   'meter',
                     's':   'second', 
@@ -200,6 +200,11 @@ class DataContainer(object):
         setattr(frameTime, "calender", "gregorian")
         setattr(frameTime, "notes",    "Each time of the scanline of the y taken")
 
+        solar_zenith_ang = netCDFHandler.createVariable("solar_zenith_angle", "f8", ("time",))
+        solar_zenith_ang[...] = [solar_zenith_angle(datetime(year=1970,month=1,day=1)+timedelta(days=time_member)) for time_member in tempFrameTime]
+        setattr(solar_zenith_ang, "units", "degree")
+        setattr(solar_zenith_ang, "long_name", "Solar Zenith Angle")
+        setattr(solar_zenith_ang, "notes", "The angle of the sun comparing to the vertical axis of the Cartesian Coordinate")
         ########################### Adding geographic positions ###########################
 
         if "scanSpeedInMPerS" in dir(netCDFHandler.groups["gantry_system_variable_metadata"]):

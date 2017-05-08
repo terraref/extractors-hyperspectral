@@ -257,6 +257,13 @@ class HyperspectralWorkflowTest(unittest.TestCase):
         self.assertFalse(result, msg="The graph is over reflected (i.e., has the pixel grater than the max. planet reflectance, now = "+\
                                       str(MAXIMUM_PLANT_REFLECTANCE)+" )")
 
+    def testSolarZenithAngleInReseaonableRange(self):
+        self.graph  = np.array(self.masterNetCDFHandler.variables["solar_zenith_angle"])
+        result_over = (self.graph > 90).any()
+        result_lower = (self.graph < 0).any()
+        self.assertFalse(result_over and result_lower, msg="The graph is over reflected (i.e., has the pixel grater than the max. planet reflectance, now = "+\
+                                      str(MAXIMUM_PLANT_REFLECTANCE)+" )")
+
     @unittest.expectedFailure
     def testCalibrationGraphIsOverExposured(self):
         self.graph = np.array(self.masterNetCDFHandler.variables["xps_img"])
