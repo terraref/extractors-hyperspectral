@@ -29,6 +29,21 @@ def julian_date(time_string):
 
 def solar_zenith_angle(time_string):
     raise NotImplementedError
+# from Dr. LeBauer, Github thread: terraref/referece-data #32
+# This matrix looks like this:
+#
+#     | alphaX, gamma, u0 |
+#     |			  |
+# A = |   0 ,  alphaY, v0 |
+#     |			  |
+#     |   0 ,    0,     1 |
+#
+# where alphaX = alphaY = CAMERA_FOCAL_LENGTH / PIXEL_PITCH,
+#       GAMMA is calibration constant
+#       u0 and v0 are the center coordinate of the image (waiting to be found)
+#
+# will be used in calculating the lat long of the image
+
 
 def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption, downsampled=False):
 
@@ -82,7 +97,7 @@ def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption, downsam
         if not downsampled:
             y_final_result = np.array([y * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
         else:
-            y_final_result = np.array([y * 0.5 * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
+            y_final_result = np.array([y * 2 * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
 
         ########### Sample result: x -> 0.377 [m], y -> 0.267 [m] ###########
 
