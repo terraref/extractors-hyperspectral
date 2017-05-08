@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import unittest
+import argparse
 import sys
 from netCDF4 import Dataset
 
@@ -14,7 +15,7 @@ and will take one or two samples to check the values.
 
 ==============================================================================
 To run the test from the commandline, do:
-python hyperspectral_test.py <input_netCDF_file> <verbosity_level> <maximum_saturated_exposure>
+python hyperspectral_test.py <input_netCDF_file> <verbosity_level> <maximum_planet_reflectance>
 
 * verbosity level can be 0, 1 or 2 (from the quietest to the most verbose)
 
@@ -49,7 +50,12 @@ NOTES:
 EXPECTED_NUMBER_OF_GROUPS     = 6
 EXPECTED_NUMBER_OF_DIMENSIONS = 4
 TEST_FILE_DIRECTORY           = None
-MAXIMUM_SATURATED_EXPOSURE    = 0
+MAXIMUM_PLANT_REFLECTANCE     = 0
+DEFAULT_PLANT_REFLECTANCE     = 0.6
+SATURATED_EXPOSURE            = 0
+DEFAULT_SATURATED_EXPOSURE    = 2**16 - 1
+MAXIMUM_SATURATED_REFLECTANCE = 0
+
 
 
 class HyperspectralWorkflowTest(unittest.TestCase):
@@ -245,16 +251,39 @@ class HyperspectralWorkflowTest(unittest.TestCase):
 
     # Walk through the reflectance image and compare with the max.sat.exp. to see whether it is overexposured
     @unittest.expectedFailure
-    def testCalibrationGraphIsOverExposured(self):
+    def testCalibrationGraphIsOverReflected(self):
         self.graph = np.array(self.masterNetCDFHandler.variables["rfl_img"])
-        result = (self.graph > MAXIMUM_SATURATED_EXPOSURE).any()
-        self.assertFalse(result, msg="The graph is overexposured (i.e., has the pixel grater than the max. saturated exposure)")
+        result = (self.graph > MAXIMUM_PLANT_REFLECTANCE).any()
+        self.assertFalse(result, msg="The graph is over reflected (i.e., has the pixel grater than the max. planet reflectance, now = "+\
+                                      str(MAXIMUM_PLANT_REFLECTANCE)+" )")
+
+    @unittest.expectedFailure
+    def testCalibrationGraphIsOverExposured(self):
+        self.graph = np.array(self.masterNetCDFHandler.variables["xps_img"])
+        result = (self.graph > SATURATED_EXPOSURE).any()
+        self.assertFalse(result, msg="The graph is over exposured (i.e., has the pixel grater than the default saturated exposure, now = "+\
+                                      str(SATURATED_EXPOSURE)+" )")
 
 
 if __name__ == "__main__":
+    test_parser = argparse.ArgumentParser()
+    test_parser.add_argument('input_file_path', type=str, nargs=1,
+                             help='The path to the final output')
+    test_parser.add_argument('verbosity', type=int, nargs='?', default=3,
+                             help='The verbosity of the test report (from 1 <least verbose> to 3 <the most verbose>)')
+    test_parser.add_argument('maximum_planet_reflectance', type=float, nargs='?', default=DEFAULT_PLANT_REFLECTANCE,
+                             help='The maximum planet reflectance that has physical meaning (default=0.6)')
+    test_parser.add_argument('saturated_exposure', type=int, nargs='?', default=DEFAULT_SATURATED_EXPOSURE,
+                             help='The maximum saturated exposure that has physical meaning (default=2^16-1)')
+
+    args = test_parser.parse_args()
+
     TEST_FILE_DIRECTORY = sys.argv[1]
-    MAXIMUM_SATURATED_EXPOSURE = sys.argv[-1] if len(sys.argv) == 4 else 0
+    MAXIMUM_SATURATED_REFLECTANCE = float(sys.argv[-1]) if len(sys.argv) == 4 else 0.4
+    TEST_FILE_DIRECTORY       = args.input_file_path[0]
+    MAXIMUM_PLANT_REFLECTANCE = args.maximum_planet_reflectance
+    SATURATED_EXPOSURE        = args.saturated_exposure
     testSuite   = unittest.TestLoader().loadTestsFromTestCase(HyperspectralWorkflowTest)
-    runner      = unittest.TextTestRunner(verbosity=int(sys.argv[2])).run(testSuite)
+    runner      = unittest.TextTestRunner(verbosity=args.verbosity).run(testSuite)
     returnValue = runner.wasSuccessful()
     sys.exit(not returnValue)
