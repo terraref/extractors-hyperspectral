@@ -3,6 +3,7 @@
 import numpy as np
 import sys
 import json
+from datetime import date, datetime
 
 # from Dr. LeBauer, Github thread: terraref/referece-data #32
 CAMERA_POSITION = np.array([1.9, 0.855, 0.635])
@@ -13,14 +14,6 @@ CAMERA_FOCAL_LENGTH = 24e-3 # the focal length for SWIR camera. unit:[m]
 # from Dr. LeBauer, Github thread: terraref/referece-data #32
 PIXEL_PITCH = 25e-6 #[m]
 
-# from Dr. LeBauer, Github thread: terraref/referece-data #32
-# Originally in 33, 04.470' N / -111, 58.485' W
-#print REFERENCE_POINT_LATLONG
-
-# from Dr. LeBauer, Github thread: terraref/referece-data #32
-GAMMA = 0 #TODO: waiting for the correct value
-
-
 REFERENCE_POINT = 33 + 4.47 / 60, -111 - 58.485 / 60 # from https://github.com/terraref/reference-data/issues/32
 
 LONGITUDE_TO_METER = 1 / (30.87 * 3600)
@@ -28,22 +21,14 @@ LATITUDE_TO_METER  = 1/ (25.906 * 3600) #varies, but has been corrected based on
 
 GOOGLE_MAP_TEMPLATE = "https://maps.googleapis.com/maps/api/staticmap?size=1280x720&zoom=17&path=color:0x0000005|weight:5|fillcolor:0xFFFF0033|{pointA}|{pointB}|{pointC}|{pointD}"
 
-# from Dr. LeBauer, Github thread: terraref/referece-data #32
-# This matrix looks like this:
-#
-#     | alphaX, gamma, u0 |
-#     |			  |
-# A = |   0 ,  alphaY, v0 |
-#     |			  |
-#     |   0 ,    0,     1 |
-#
-# where alphaX = alphaY = CAMERA_FOCAL_LENGTH / PIXEL_PITCH,
-#       GAMMA is calibration constant
-#       u0 and v0 are the center coordinate of the image (waiting to be found)
-#
-# will be used in calculating the lat long of the image
 
-ORIENTATION_MATRIX = np.array([[CAMERA_FOCAL_LENGTH / PIXEL_PITCH, GAMMA, 0], [0, CAMERA_FOCAL_LENGTH / PIXEL_PITCH, 0 ], [0, 0, 1]])
+def julian_date(time_string):
+    timeUnpack = datetime.strptime(time_string, "%m/%d/%Y %H:%M:%S").timetuple()
+    raise NotImplementedError
+
+
+def solar_zenith_angle(time_string):
+    raise NotImplementedError
 
 def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption, downsampled=False):
 
@@ -97,7 +82,7 @@ def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption, downsam
         if not downsampled:
             y_final_result = np.array([y * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
         else:
-            y_final_result = np.array([y * 1.5 * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
+            y_final_result = np.array([y * 0.5 * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
 
         ########### Sample result: x -> 0.377 [m], y -> 0.267 [m] ###########
 
