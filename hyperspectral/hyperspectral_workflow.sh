@@ -681,6 +681,12 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 
 	# Calculate hyperspectral indices file 
 	if [ "${hsi_flg}" = 'Yes' ]; then
+            # check for auto generated include file "hyperspectral_indices_meta.nco" (created from BETYDB )
+            hsi_meta="${drc_spt}/hyperspectral_indices_meta.nco"   
+            # create file if it doesn't exists or is more than 24 hours old
+            if [ ! -e "$hsi_meta" ] || [  $(( $(date +'%s') - $(stat -c "%Y" "$hsi_meta") )) -gt $(( 24*60*60 ))  ]; then 
+              "${drc_spt}/get_meta_indicex_bety.py" > "$hsi_meta"                                    
+            fi           
             hsi_in=${clb_out}
             hsi_out="${out_fl/.nc/_ind.nc}"    
 	    printf "hsi(in)  : ${hsi_in}\n"
