@@ -58,7 +58,7 @@ def prnVar(myVar):
             continue;
 
         if len(value)>0:
-            print '{0}@{1}="{2}";'.format(nameInd, field, value)
+            print '\'{0}@{1}\'="{2}";'.format(nameInd, field, value)
 
 
 
