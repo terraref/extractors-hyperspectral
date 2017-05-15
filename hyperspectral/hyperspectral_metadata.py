@@ -204,6 +204,7 @@ class DataContainer(object):
         solar_zenith_ang[...] = [solar_zenith_angle(datetime(year=1970,month=1,day=1)+timedelta(days=time_member)) for time_member in tempFrameTime]
         setattr(solar_zenith_ang, "units", "degree")
         setattr(solar_zenith_ang, "long_name", "Solar Zenith Angle")
+        setattr(solar_zenith_ang, "acknowledgements", "Algorithm provided by Charles S. Zender, this Python implementation was translated from his original C program")
         setattr(solar_zenith_ang, "notes", "The angle of the sun comparing to the vertical axis of the Cartesian Coordinate")
         ########################### Adding geographic positions ###########################
 
