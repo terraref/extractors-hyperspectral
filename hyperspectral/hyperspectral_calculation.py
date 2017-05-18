@@ -3,7 +3,9 @@
 import numpy as np
 import sys
 import json
-from datetime import date, datetime
+from math import *
+from datetime import date, datetime, timedelta
+from decimal import *
 
 # from Dr. LeBauer, Github thread: terraref/referece-data #32
 CAMERA_POSITION = np.array([1.9, 0.855, 0.635])
@@ -22,27 +24,73 @@ LATITUDE_TO_METER  = 1/ (25.906 * 3600) #varies, but has been corrected based on
 GOOGLE_MAP_TEMPLATE = "https://maps.googleapis.com/maps/api/staticmap?size=1280x720&zoom=17&path=color:0x0000005|weight:5|fillcolor:0xFFFF0033|{pointA}|{pointB}|{pointC}|{pointD}"
 
 
-def julian_date(time_string):
-    timeUnpack = datetime.strptime(time_string, "%m/%d/%Y %H:%M:%S").timetuple()
-    raise NotImplementedError
+def _julian_date(time_date):
+    '''
+    Calculate the Julian Date based on the input datetime object (should
+    be in Gregorian).
+    
+    Private in this module
 
+    Had already checked the output against the result from
+    United States Naval Observatory, Astronomical App Dept.
+    
+    Detail: http://aa.usno.navy.mil/data/docs/JulianDate.php
+    '''
+    a = floor((14-time_date.month)/12)
+    
+    if time_date.month in (1, 2):
+        assert a == 1
+    else:
+        assert a == 0
+        
+    years  = time_date.year + 4800 - a
+    months = time_date.month + 12 * a - 3
+    
+    if time_date.month == 3:
+        assert months == 0
+    elif time_date.month == 2:
+        assert months == 11
+    
+    getcontext().prec = 8
+    return time_date.day  + floor((153*months+2)/5) + 365*years +\
+           floor(years/4) - floor(years/100) + floor(years/400) - 32045 +\
+           float(Decimal(time_date.hour-12)/Decimal(24) + Decimal(time_date.minute)/Decimal(1440)+\
+           Decimal(time_date.second)/Decimal(86400))
+        
+        
+def solar_zenith_angle(time_date):
 
-def solar_zenith_angle(time_string):
-    raise NotImplementedError
-# from Dr. LeBauer, Github thread: terraref/referece-data #32
-# This matrix looks like this:
-#
-#     | alphaX, gamma, u0 |
-#     |			  |
-# A = |   0 ,  alphaY, v0 |
-#     |			  |
-#     |   0 ,    0,     1 |
-#
-# where alphaX = alphaY = CAMERA_FOCAL_LENGTH / PIXEL_PITCH,
-#       GAMMA is calibration constant
-#       u0 and v0 are the center coordinate of the image (waiting to be found)
-#
-# will be used in calculating the lat long of the image
+    latitude = 33 + 4.47 / 60
+    
+    days_offset       = time_date - datetime(year=time_date.year,month=1,day=1) +\
+                        timedelta(days=1)
+    numerical_cal_day = Decimal(days_offset.days) + Decimal(days_offset.seconds) /\
+                        Decimal(86340)
+    
+    theta = Decimal(2)*Decimal(pi)*numerical_cal_day/Decimal(365)
+    
+    eccentricity_fac = Decimal(1.000110)+\
+                       Decimal(cos(theta))*Decimal(0.034221)+\
+                       Decimal(sin(theta))*Decimal(0.001280)+\
+                       Decimal(cos(Decimal(2)*theta))*Decimal(0.000719)+\
+                       Decimal(sin(Decimal(2)*theta))*Decimal(0.000077)
+    
+    solar_decline    = Decimal(0.006918) - Decimal(0.399912)*Decimal(cos(theta))+\
+                                           Decimal(0.070257)*Decimal(sin(theta))-\
+                                           Decimal(0.006758)*Decimal(cos(Decimal(2)*theta))+\
+                                           Decimal(0.000907)*Decimal(sin(Decimal(2)*theta))-\
+                                           Decimal(0.002697)*Decimal(cos(Decimal(3)*theta))+\
+                                           Decimal(0.001480)*Decimal(sin(Decimal(3)*theta))
+                        
+    sin_latitude     = Decimal(sin(radians(latitude)))
+    sin_delta        = Decimal(sin(solar_decline))
+    cos_latitude     = Decimal(cos(radians(latitude)))
+    cos_delta        = Decimal(cos(solar_decline))
+    
+    cphase = Decimal(cos(Decimal(2*pi)*numerical_cal_day))
+    cos_solar_zen_ang = sin_latitude*sin_delta-cos_latitude*cos_delta*cphase
+    
+    return float(Decimal(acos(cos_solar_zen_ang)/pi)*Decimal(180))
 
 
 def pixel2Geographic(jsonFileLocation, headerFileLocation, cameraOption, downsampled=False):
