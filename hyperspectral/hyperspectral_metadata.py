@@ -177,7 +177,7 @@ class DataContainer(object):
         netCDFHandler.createDimension("wavelength", len(wavelength))
 
         # Check if the wavelength is correctly collected
-        assert len(wavelength) in (955, 272), "ERROR: Failed to get wavlength informations. Please check if you modified the *.hdr files"
+        assert len(wavelength) in (955, 272, 273), "ERROR: Failed to get wavlength information. Please check if you modified the *.hdr files"
 
         camera_opt = 'VNIR' if len(wavelength) == 955 else 'SWIR' # Choose appropriate camera by counting the number of wavelengths.
 
