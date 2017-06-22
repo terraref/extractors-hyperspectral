@@ -217,7 +217,7 @@ def get_all_files(resource):
 
 # Returns the output filename.
 def get_output_filename(raw_filename):
-	return '%s.nc' % raw_filename[:-len('raw')]
+	return '%s.nc' % raw_filename[:-len('_raw')]
 
 # Returns true if all expected files are found.
 def has_all_files(resource):
