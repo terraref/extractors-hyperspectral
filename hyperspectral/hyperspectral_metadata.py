@@ -177,7 +177,7 @@ class DataContainer(object):
         netCDFHandler.createDimension("wavelength", len(wavelength))
 
         # Check if the wavelength is correctly collected
-        assert len(wavelength) in (955, 272), "ERROR: Failed to get wavlength informations. Please check if you modified the *.hdr files"
+        assert len(wavelength) in (955, 272, 273), "ERROR: Failed to get wavlength information. Please check if you modified the *.hdr files"
 
         camera_opt = 'VNIR' if len(wavelength) == 955 else 'SWIR' # Choose appropriate camera by counting the number of wavelengths.
 
@@ -198,7 +198,7 @@ class DataContainer(object):
         frameTime[...] = tempFrameTime
         setattr(frameTime, "units",    "days since 1970-01-01 00:00:00")
         setattr(frameTime, "calender", "gregorian")
-        setattr(frameTime, "notes",    "Each time of the scanline of the y taken")
+        setattr(frameTime, "notes",    "date stamp per each scanline")
 
         solar_zenith_ang = netCDFHandler.createVariable("solar_zenith_angle", "f8", ("time",))
         solar_zenith_ang[...] = [solar_zenith_angle(datetime(year=1970,month=1,day=1)+timedelta(days=time_member)) for time_member in tempFrameTime]
@@ -414,6 +414,35 @@ class DataContainer(object):
         else:
             googleMapView = netCDFHandler.createVariable("Google_Map_View", str)
             googleMapView[...] = geo_data["Google_Map"]
+
+            geojson_template =\
+            '''
+            [
+                { "type": "Feature",
+                  "geometry": {
+                  "type": "Polygon",
+                  "coordinates": [
+                     [%f,%f],
+                     [%f,%f],
+                     [%f,%f],
+                     [%f,%f]
+                  ]
+                        },
+                  "properties": {
+                  "name": "bounding box"
+                  }
+                }
+            ]
+            '''
+            geojson_obj = geojson_template%(float(lat_se),
+                                            float(lon_se),
+                                            float(lat_sw),
+                                            float(lon_sw),
+                                            float(lat_nw),
+                                            float(lon_nw),
+                                            float(lat_ne),
+                                            float(lon_ne))
+            setattr(netCDFHandler, "feature", geojson_obj)
 
         setattr(netCDFHandler.variables["Google_Map_View"], "usage", "copy and paste to your web browser")
         setattr(netCDFHandler.variables["Google_Map_View"], 'reference_point', 'Southeast corner of field')

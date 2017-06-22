@@ -29,6 +29,8 @@ class HyperspectralRaw2NetCDF(Extractor):
 		# add any additional arguments to parser
 		# self.parser.add_argument('--max', '-m', type=int, nargs='?', default=-1,
 		#                          help='maximum number (default=-1)')
+		self.parser.add_argument('--overwrite', dest="force_overwrite", type=bool, nargs='?', default=False,
+								 help="whether to overwrite output file if it already exists in output directory")
 		self.parser.add_argument('--output', '-o', dest="output_dir", type=str, nargs='?',
 								 default="/home/ubuntu/sites/ua-mac/Level_1/hyperspectral",
 								 help="root directory where timestamp & output directories will be created")
@@ -45,11 +47,12 @@ class HyperspectralRaw2NetCDF(Extractor):
 
 		# assign other arguments
 		self.output_dir = self.args.output_dir
+		self.force_overwrite = self.args.force_overwrite
 		self.main_script = self.args.main_script
 
 	def check_message(self, connector, host, secret_key, resource, parameters):
 		if has_all_files(resource):
-			if has_output_file(resource):
+			if has_output_file(resource) and not self.force_overwrite:
 				logging.info('skipping dataset %s, output file already exists' % resource['id'])
 				return CheckMessage.ignore
 			else:
