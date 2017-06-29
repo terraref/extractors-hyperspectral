@@ -1,30 +1,28 @@
 #!/usr/bin/env python
 
-"""
-terra.hyperspectral.py
-
-This extractor will trigger when a file is added to a dataset in Clowder.
-It checks if all the required input files are present in the dataset while the
-output file is not present. The output filename is always determined from the
-filename of the `raw` file.
-If the check is OK, it calls the `workerScript` defined in the config file to
-create a netCDF output file and adds that to the same dataset.
-"""
-
 import os
 import subprocess
 import json
 import logging
 import tempfile
+import datetime
 
 from pyclowder.extractors import Extractor
 from pyclowder.utils import CheckMessage
 import pyclowder.files
 import pyclowder.datasets
+import terrautils.extractors
+
 
 class HyperspectralRaw2NetCDF(Extractor):
 	def __init__(self):
 		Extractor.__init__(self)
+
+		influx_host = os.getenv("INFLUXDB_HOST", "terra-logging.ncsa.illinois.edu")
+		influx_port = os.getenv("INFLUXDB_PORT", 8086)
+		influx_db = os.getenv("INFLUXDB_DB", "extractor_db")
+		influx_user = os.getenv("INFLUXDB_USER", "terra")
+		influx_pass = os.getenv("INFLUXDB_PASSWORD", "")
 
 		# add any additional arguments to parser
 		# self.parser.add_argument('--max', '-m', type=int, nargs='?', default=-1,
@@ -37,6 +35,16 @@ class HyperspectralRaw2NetCDF(Extractor):
 		self.parser.add_argument('--script', dest="main_script", type=str, nargs='?',
 								 default="hyperspectral_workflow.sh",
 								 help="location of hyperspectral_workflow.sh file")
+		self.parser.add_argument('--influxHost', dest="influx_host", type=str, nargs='?',
+								 default=influx_host, help="InfluxDB URL for logging")
+		self.parser.add_argument('--influxPort', dest="influx_port", type=int, nargs='?',
+								 default=influx_port, help="InfluxDB port")
+		self.parser.add_argument('--influxUser', dest="influx_user", type=str, nargs='?',
+								 default=influx_user, help="InfluxDB username")
+		self.parser.add_argument('--influxPass', dest="influx_pass", type=str, nargs='?',
+								 default=influx_pass, help="InfluxDB password")
+		self.parser.add_argument('--influxDB', dest="influx_db", type=str, nargs='?',
+								 default=influx_db, help="InfluxDB database")
 
 		# parse command line and load default logging configuration
 		self.setup()
@@ -49,8 +57,18 @@ class HyperspectralRaw2NetCDF(Extractor):
 		self.output_dir = self.args.output_dir
 		self.force_overwrite = self.args.force_overwrite
 		self.main_script = self.args.main_script
+		self.influx_params = {
+			"host": self.args.influx_host,
+			"port": self.args.influx_port,
+			"db": self.args.influx_db,
+			"user": self.args.influx_user,
+			"pass": self.args.influx_pass
+		}
 
 	def check_message(self, connector, host, secret_key, resource, parameters):
+		if not terrautils.extractors.is_latest_file(resource):
+			return CheckMessage.ignore
+
 		if has_all_files(resource):
 			if has_output_file(resource) and not self.force_overwrite:
 				logging.info('skipping dataset %s, output file already exists' % resource['id'])
@@ -80,6 +98,10 @@ class HyperspectralRaw2NetCDF(Extractor):
 			return CheckMessage.ignore
 
 	def process_message(self, connector, host, secret_key, resource, parameters):
+		starttime = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+		created = 0
+		bytes = 0
+
 		# Find input files in dataset
 		target_files = {
 			'raw': None,
@@ -181,8 +203,11 @@ class HyperspectralRaw2NetCDF(Extractor):
 			logging.error('script encountered an error')
 		if os.path.exists(outFilePath):
 			if returncode == 0:
-				logging.info('uploading %s' % outFilePath)
-				pyclowder.files.upload_to_dataset(connector, host, secret_key, resource['id'], outFilePath)
+				if outFilePath not in resource['local_paths']
+					logging.info('uploading %s' % outFilePath)
+					pyclowder.files.upload_to_dataset(connector, host, secret_key, resource['id'], outFilePath)
+				created += 1
+				bytes += os.path.getsize(outFilePath)
 		else:
 			logging.error('no output file was produced')
 
@@ -191,6 +216,10 @@ class HyperspectralRaw2NetCDF(Extractor):
 			os.remove(sym)
 		if tempdir:
 			os.rmdir(tempdir)
+
+		endtime = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+		terrautils.extractors.log_to_influxdb(self.extractor_info['name'], self.influx_params,
+											  starttime, endtime, created, bytes)
 
 # Find as many expected files as possible and return the set.
 def get_all_files(resource):
