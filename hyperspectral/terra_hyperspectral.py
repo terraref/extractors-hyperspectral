@@ -203,7 +203,7 @@ class HyperspectralRaw2NetCDF(Extractor):
 			logging.error('script encountered an error')
 		if os.path.exists(outFilePath):
 			if returncode == 0:
-				if outFilePath not in resource['local_paths']
+				if outFilePath not in resource['local_paths']:
 					logging.info('uploading %s' % outFilePath)
 					pyclowder.files.upload_to_dataset(connector, host, secret_key, resource['id'], outFilePath)
 				created += 1
