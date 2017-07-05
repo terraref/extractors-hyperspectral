@@ -186,7 +186,7 @@ if( fabs(wavelength(iR700)-7e-7) > 0.01e-7d )
    /* add SoilRemovalMask */
    if(flg_mss && exists(SoilRemovalMask))
    {
-     where( SoilRemovalMask != 0.0)      
+     where( SoilRemovalMask != 0)      
        *@var_nm=flt_mss;
 
    } 
