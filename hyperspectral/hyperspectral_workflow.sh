@@ -126,6 +126,7 @@ fl_nbr=0 # [nbr] Number of files
 job_nbr=6 # [nbr] Job simultaneity for parallelism
 mpi_flg='No' # [sng] Parallelize over nodes
 mtd_mk='Yes' # [sng] Process metadata
+msk_fl=''    # [sng] full canonical file name of soil mask
 nco_opt='' # [sng] NCO defaults (e.g., '-D 1')
 nco_usr='' # [sng] NCO user-configurable options (e.g., '-D 2')
 nd_nbr=1 # [nbr] Number of nodes
@@ -205,7 +206,7 @@ if [ ${arg_nbr} -eq 0 ]; then
   fnc_usg_prn
 fi # !arg_nbr
 
-while getopts c:d:hI:i:j:N:n:O:o:p:T:t:u:x OPT; do
+while getopts c:d:hI:i:j:m:N:n:O:o:p:T:t:u:x OPT; do
     case ${OPT} in
 	c) dfl_lvl=${OPTARG} ;; # Compression deflate level
 	d) dbg_lvl=${OPTARG} ;; # Debugging level
@@ -213,6 +214,7 @@ while getopts c:d:hI:i:j:N:n:O:o:p:T:t:u:x OPT; do
 	I) drc_in=${OPTARG} ;; # Input directory
 	i) in_fl=${OPTARG} ;; # Input file
 	j) job_usr=${OPTARG} ;; # Job simultaneity
+	m) msk_fl=${OPTARG} ;;  # full filename of netCDF soil mask
 	N) ntl_out=${OPTARG} ;; # Interleave-type
 	n) nco_usr=${OPTARG} ;; # NCO options
 	O) drc_usr=${OPTARG} ;; # Output directory
@@ -686,7 +688,16 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
             # create file if it doesn't exists or is more than 24 hours old
             if [ ! -e "$hsi_meta" ] || [  $(( $(date +'%s') - $(stat -c "%Y" "$hsi_meta") )) -gt $(( 24*60*60 ))  ]; then 
               "${drc_spt}/get_meta_indicex_bety.py" > "$hsi_meta"                                    
-            fi           
+            fi
+           
+            # add var SoilRemovalMask to clb_out - if dims x,y dont match then print warning and continue
+            if [ -e "${msk_fl}" ]; then 
+               ncks -A -v "SoilRemovalMask" "${msk_fl}" "${clb_out}" 
+               if [ $? -ne 0 ]; then
+                 echo "WARNING addition of the var \"SoilRemovalMask\" from the file \"${msk_fl}\" failed. Possibly the dims x, y in this file dont match the data dims. x=${xdm_nbr}, y=${ydm_nbr}"     
+               fi     
+            fi
+  
             hsi_in=${clb_out}
             hsi_out="${out_fl/.nc/_ind.nc}"    
 	    printf "hsi(in)  : ${hsi_in}\n"

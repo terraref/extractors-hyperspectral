@@ -181,8 +181,20 @@ if( fabs(wavelength(iR700)-7e-7) > 0.01e-7d )
     where (*@var_nm <= 0.0f)
       *@var_nm=flt_mss;  
 
-    *@var_nm.set_miss(flt_mss);  
    }
+
+   /* add SoilRemovalMask */
+   if(flg_mss && exists(SoilRemovalMask))
+   {
+     where( SoilRemovalMask != 0)      
+       *@var_nm=flt_mss;
+
+   } 
+   
+   if(flg_mss) 
+      *@var_nm.set_miss(flt_mss);  
+  
+
 
     /* create avg of hyperslabs */
    if(flg_abr)
