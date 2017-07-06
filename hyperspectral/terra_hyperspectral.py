@@ -195,7 +195,7 @@ class HyperspectralRaw2NetCDF(Extractor):
 		# Invoke terraref.sh
 		logging.debug('invoking terraref.sh to create: %s' % outFilePath)
 		#returncode = subprocess.call(["bash", self.main_script, "-d", "2", "-I", inputDirectory, "-o", outFilePath])
-		returncode = subprocess.call(["bash", self.main_script, "-d", "1", "-i", target_files['raw']['path'], "-o", outFilePath])
+		returncode = subprocess.call(["bash", self.main_script, "-d", "1", "-h", "-i", target_files['raw']['path'], "-o", outFilePath])
 
 		# Verify outfile exists and upload to clowder
 		logging.debug('done creating output file (%s)' % (returncode))
