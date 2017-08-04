@@ -24,7 +24,7 @@ This is the main shell script:
 
 - -c dfl_lvl  Compression level [0..9] (empty means none) (default )
 - -d dbg_lvl  Debugging level (default 0)
-- -h          Create indices file. This is the same root name as out_fl but with the suffix "_ind.nc"    
+- -h          Create indices file. This has the same root name as out_fl but with the suffix "_ind.nc"    
 - -I drc_in   Input directory (empty means none) (default )
 - -i in_fl    Input filename (required) (default )
 - -j job_nbr  Job simultaneity for parallelism (default 6)
