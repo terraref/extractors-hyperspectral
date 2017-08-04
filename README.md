@@ -18,8 +18,29 @@ _Output_
   - The dataset containing the _raw file will get a corresponding .nc netCDF file
 
 ## Scripts:
+1. hyperspectral_workflow.sh
 
-1. CalculationWorks.py
+This is the main shell script:
+
+-c dfl_lvl  Compression level [0..9] (empty means none) (default )
+-d dbg_lvl  Debugging level (default 0)
+-h          Create indices file. This is the same root name as out_fl but with the suffix "_ind.nc"    
+-I drc_in   Input directory (empty means none) (default )
+-i in_fl    Input filename (required) (default )
+-j job_nbr  Job simultaneity for parallelism (default 6)
+-m msk_fl   location of Netcdf Soil Mask (Level 1 data) applied when creating indices file
+-n nco_opt  NCO options (empty means none) (default )
+-N ntl_out  Interleave-type of output (default bsq)
+-O drc_out  Output directory (default /home/butowskh/terraref/extractors-hyperspectral/hyperspectral)
+-o out_fl   Output-file (empty derives from Input filename) (default )
+-p par_typ  Parallelism type (default bck)
+-t typ_out  Type of netCDF output (default NC_USHORT)
+-T drc_tmp  Temporary directory (default /gpfs_scratch/arpae/imaging_spectrometer)
+-u unq_sfx  Unique suffix (prevents intermediate files from sharing names) (default .pid140080)
+-x xpt_flg  Experimental (default No)
+
+
+2. CalculationWorks.py
 
 A supporting module for EnvironmentalLoggerAnalyser.py and JsonDealer.py.
 This module is in charge of all the calculation works needed in the
