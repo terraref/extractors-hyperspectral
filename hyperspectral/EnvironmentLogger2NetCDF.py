@@ -1,5 +1,4 @@
-#!/usr/bin/python -O
-
+#!/usr/bin/env python
 
 import os
 import sys
@@ -15,7 +14,7 @@ from netCDF4 import Dataset
 def main(elFile, ncFile):
 
     # read all of json in one go
-    fp = open(elFile, "r+")
+    fp = open(elFile, "r")
     lines = fp.readlines()
     slines = "".join(lines)
     js = json.loads(slines)
