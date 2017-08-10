@@ -1,6 +1,6 @@
 # Dockerfile for the TerraRef hyperspectral image conversion extractor
 # August 17, 2016
-FROM ubuntu:14.04
+FROM terraref/terrautils
 MAINTAINER Yan Y. Liu <yanliu@illinois.edu>
 
 # install common libraries and python modules
@@ -25,7 +25,7 @@ ENV PYTHONPATH="/usr/lib/python2.7/dist-packages:${PYTHONPATH}"
 
 # hdf5
 RUN cd /srv/downloads && \
-    wget -q https://www.hdfgroup.org/ftp/HDF5/releases/hdf5-1.8.17/src/hdf5-1.8.17.tar.gz && \
+    wget -q https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.8/hdf5-1.8.17/src/hdf5-1.8.17.tar.gz && \
     tar xfz hdf5-1.8.17.tar.gz && \
     cd hdf5-1.8.17 && \
     ./configure --prefix=/srv/sw/hdf5-1.8.17 && \
@@ -93,9 +93,7 @@ WORKDIR "${USERHOME}"
 RUN cd ${USERHOME} && \
     virtualenv pyenv && \
     . pyenv/bin/activate && \
-    pip install pika urllib3 requests && \
     CC=gcc CXX=g++ USE_SETUPCFG=0 HDF5_INCDIR=/srv/sw/hdf5-1.8.17/include HDF5_LIBDIR=/srv/sw/hdf5-1.8.17/lib NETCDF4_INCDIR=/srv/sw/netcdf-4.4.1/include NETCDF4_LIBDIR=/srv/sw/netcdf-4.4.1/lib pip install netCDF4 && \
-    pip install git+https://opensource.ncsa.illinois.edu/stash/scm/cats/pyclowder.git && \
     deactivate
 
 ## create workspace directories
