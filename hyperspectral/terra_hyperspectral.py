@@ -5,6 +5,7 @@ import subprocess
 import json
 import logging
 import tempfile
+from netCDF4 import Dataset
 
 from pyclowder.utils import CheckMessage
 from pyclowder.datasets import download_metadata
@@ -26,18 +27,20 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		add_local_arguments(self.parser)
 
 		# parse command line and load default logging configuration
-		# TODO: hyperspectral is missing from terrautils dict!
-		self.setup(sensor='hyperspectral')
+		self.setup(sensor='hyperspectral2nc')
 
 	def check_message(self, connector, host, secret_key, resource, parameters):
 		if not is_latest_file(resource):
 			return CheckMessage.ignore
 
+		# Adjust sensor path based on VNIR vs SWIR
+		sensor_fullname = self.sensors.sensor+(
+			"_swir" if resource['dataset_info']['name'].find("SWIR") > -1 else "_vnir")
+
 		if has_all_files(resource):
 			# Check if output already exists
 			timestamp = resource['dataset_info']['name'].split(" - ")[1]
-			outFilePath = self.sensors.get_sensor_path(timestamp, sensor=self.sensors.sensor+(
-				"_swir" if resource['dataset_info']['name'].find("SWIR") > -1 else ""))
+			outFilePath = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname)
 
 			if os.path.exists(outFilePath) and not self.force_overwrite:
 				logging.info('skipping dataset %s, output file already exists' % resource['id'])
@@ -128,11 +131,11 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 				os.symlink(currf['path'], newf)
 				symlinks.append(newf)
 
-		# Prep output location
+		# Adjust sensor path based on VNIR vs SWIR
+		sensor_fullname = self.sensors.sensor+(
+			"_swir" if resource['dataset_info']['name'].find("SWIR") > -1 else "_vnir")
 		timestamp = resource['dataset_info']['name'].split(" - ")[1]
-		outFilePath = self.sensors.get_sensor_path(timestamp, sensor=self.sensors.sensor+(
-			"_swir" if resource['dataset_info']['name'].find("SWIR") > -1 else ""))
-		self.sensors.create_sensor_path(outFilePath)
+		outFilePath = self.sensors.create_sensor_path(timestamp, sensor=sensor_fullname)
 
 		# Invoke terraref.sh
 		logging.debug('invoking terraref.sh to create: %s' % outFilePath)
@@ -147,10 +150,10 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		if os.path.exists(outFilePath):
 			if returncode == 0:
 				if outFilePath not in resource['local_paths']:
-					# TODO: Store root collection name in sensors.py?
 					target_dsid = build_dataset_hierarchy(connector, host, secret_key, self.clowderspace,
-														  "hyperspectral netCDF", timestamp[:4], timestamp[:7],
-														  timestamp[:10], leaf_ds_name=resource['dataset_info']['name'])
+														  self.sensors.get_display_name(sensor=sensor_fullname),
+														  timestamp[:4], timestamp[:7], timestamp[:10],
+														  leaf_ds_name=resource['dataset_info']['name'])
 
 					logging.info('uploading %s' % outFilePath)
 					upload_to_dataset(connector, host, secret_key, target_dsid, outFilePath)
@@ -158,6 +161,14 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 				self.bytes += os.path.getsize(outFilePath)
 		else:
 			logging.error('no output file was produced')
+
+		# Send indices to betyDB
+		ind_file = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname, opts=['_ind'])
+		with Dataset(ind_file, "r") as netCDF_handle:
+			memberlist = netCDF_handle.get_variables_by_attributes(sensor=lambda x: x is not None)
+			for members in memberlist:
+				# TODO: Figure out how to handle this
+				data_points = _produce_attr_dict(members)
 
 		# Remove symlinks and temp directory
 		for sym in symlinks:
@@ -201,6 +212,12 @@ def has_all_files(resource):
 
 	return allFilesFound
 
+def _produce_attr_dict(netCDF_variable_obj):
+	'''Produce a list of dictionary with attributes and value'''
+	attributes = [attr for attr in dir(netCDF_variable_obj) if isinstance(attr, unicode)]
+	result     = {name:getattr(netCDF_variable_obj, name) for name in attributes}
+
+	return [dict(result.items()+ {"value":str(data)}.items()) for data in netCDF_variable_obj[...]]
 
 if __name__ == "__main__":
 	extractor = HyperspectralRaw2NetCDF()

@@ -9,7 +9,7 @@ RUN apt-get update && \
     apt-get upgrade -y -q && \
     apt-get install -y -q build-essential m4 swig antlr libantlr-dev udunits-bin libudunits2-dev \
                           unzip cmake wget git libjpeg-dev libpng-dev libtiff-dev \
-                          python-dev python-numpy python-pip python-virtualenv && \
+                          python-dev python-numpy python-virtualenv bison flex && \
     # set up dirs for user installed software
     useradd -m -s /bin/bash ubuntu && \
     mkdir /srv/downloads && \
@@ -77,13 +77,13 @@ ENV PATH="/srv/sw/gdal/bin:${PATH}" \
 
 # nco
 RUN cd /srv/downloads && \
-    wget -q https://github.com/nco/nco/archive/4.6.2-beta03.tar.gz -O nco-4.6.2-beta03.tar.gz && \
-    tar xfz nco-4.6.1.tar.gz && \
-    cd nco-4.6.1 && \
-    ./configure NETCDF_ROOT=/srv/sw/netcdf-4.4.1 --prefix=/srv/sw/nco-4.6.2-beta03 --enable-ncap2 --enable-udunits2 && \
+    wget -q https://github.com/nco/nco/archive/4.6.7.tar.gz -O nco-4.6.7.tar.gz && \
+    tar xfz nco-4.6.7.tar.gz && \
+    cd nco-4.6.7 && \
+    ./configure NETCDF_ROOT=/srv/sw/netcdf-4.4.1 --prefix=/srv/sw/nco-4.6.7 --enable-ncap2 --enable-udunits2 && \
     make && make install
-ENV PATH="/srv/sw/nco-4.6.2-beta03/bin:${PATH}" \
-    LD_LIBRARY_PATH="/srv/sw/nco-4.6.2-beta03/lib:${LD_LIBRARY_PATH}"
+ENV PATH="/srv/sw/nco-4.6.7/bin:${PATH}" \
+    LD_LIBRARY_PATH="/srv/sw/nco-4.6.7/lib:${LD_LIBRARY_PATH}"
 
 ENV USERHOME="/home/ubuntu"
 WORKDIR "${USERHOME}"
