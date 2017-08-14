@@ -27,15 +27,17 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		add_local_arguments(self.parser)
 
 		# parse command line and load default logging configuration
-		self.setup(sensor='hyperspectral2nc')
+		self.setup(sensor='vnir_netcdf')
 
 	def check_message(self, connector, host, secret_key, resource, parameters):
 		if not is_latest_file(resource):
 			return CheckMessage.ignore
 
 		# Adjust sensor path based on VNIR vs SWIR
-		sensor_fullname = self.sensors.sensor+(
-			"_swir" if resource['dataset_info']['name'].find("SWIR") > -1 else "_vnir")
+		if resource['dataset_info']['name'].find("SWIR") > -1:
+			sensor_fullname = 'swir_netcdf'
+		else:
+			sensor_fullname = 'vnir_netcdf'
 
 		if has_all_files(resource):
 			# Check if output already exists
@@ -132,8 +134,10 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 				symlinks.append(newf)
 
 		# Adjust sensor path based on VNIR vs SWIR
-		sensor_fullname = self.sensors.sensor+(
-			"_swir" if resource['dataset_info']['name'].find("SWIR") > -1 else "_vnir")
+		if resource['dataset_info']['name'].find("SWIR") > -1:
+			sensor_fullname = 'swir_netcdf'
+		else:
+			sensor_fullname = 'vnir_netcdf'
 		timestamp = resource['dataset_info']['name'].split(" - ")[1]
 		outFilePath = self.sensors.create_sensor_path(timestamp, sensor=sensor_fullname)
 
