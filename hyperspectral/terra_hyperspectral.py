@@ -12,13 +12,14 @@ from pyclowder.datasets import download_metadata
 from pyclowder.files import upload_to_dataset
 from terrautils.metadata import get_extractor_metadata, get_terraref_metadata
 from terrautils.extractors import TerrarefExtractor, is_latest_file, build_dataset_hierarchy
+from terrautils.betydb import submit_traits, add_arguments
 
 
 def add_local_arguments(parser):
 	# add any additional arguments to parser
 	# self.parser.add_argument('--max', '-m', type=int, nargs='?', default=-1,
 	#                          help='maximum number (default=-1)')
-	pass
+	add_arguments(parser)
 
 class HyperspectralRaw2NetCDF(TerrarefExtractor):
 	def __init__(self):
@@ -28,6 +29,10 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 
 		# parse command line and load default logging configuration
 		self.setup(sensor='vnir_netcdf')
+
+		# assign other argumentse
+		self.bety_url = self.args.bety_url
+		self.bety_key = self.args.bety_key
 
 	def check_message(self, connector, host, secret_key, resource, parameters):
 		if not is_latest_file(resource):
@@ -169,10 +174,22 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		# Send indices to betyDB
 		ind_file = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname, opts=['_ind'])
 		with Dataset(ind_file, "r") as netCDF_handle:
-			memberlist = netCDF_handle.get_variables_by_attributes(sensor=lambda x: x is not None)
-			for members in memberlist:
-				# TODO: Figure out how to handle this
-				data_points = _produce_attr_dict(members)
+			ndvi = netCDF_handle.get_variables_by_attributes(
+					standard_name='normalized_difference_chlorophyll_index_750_705')
+			NDVI705 = ndvi[0].getValue().ravel()[0]
+
+			# TODO: Create CSV using ndviVal as primary key
+			tmp_csv = 'traits.csv'
+			plot_no = 'Full Field'
+			csv_header = 'local_datetime,canopy_cover,access_level,species,site,' \
+						 'citation_author,citation_year,citation_title,method'
+			csv_vals = '%s,%s,2,Sorghum bicolor,%s,"Butowsky, Henry",2016,' \
+					   'Maricopa Field Station Data and Metadata,Hyperspectral NDVI705 Indices' % (
+							timestamp, NDVI705, plot_no)
+			with open(tmp_csv, 'w') as c:
+				c.write(csv_header+'\n'+csv_vals)
+
+		submit_traits(tmp_csv, bety_key=self.bety_key)
 
 		# Remove symlinks and temp directory
 		for sym in symlinks:
