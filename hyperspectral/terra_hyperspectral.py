@@ -13,6 +13,7 @@ from pyclowder.files import upload_to_dataset
 from terrautils.metadata import get_extractor_metadata, get_terraref_metadata
 from terrautils.extractors import TerrarefExtractor, is_latest_file, build_dataset_hierarchy
 from terrautils.betydb import submit_traits, add_arguments
+from terrautils.sensors import Sensor
 
 
 def add_local_arguments(parser):
@@ -138,19 +139,27 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 				os.symlink(currf['path'], newf)
 				symlinks.append(newf)
 
-		# Adjust sensor path based on VNIR vs SWIR
+
+		# Adjust sensor path based on VNIR vs SWIR and check for soil mask
+		timestamp = resource['dataset_info']['name'].split(" - ")[1]
 		if resource['dataset_info']['name'].find("SWIR") > -1:
 			sensor_fullname = 'swir_netcdf'
+			soil_mask = None
 		else:
 			sensor_fullname = 'vnir_netcdf'
-		timestamp = resource['dataset_info']['name'].split(" - ")[1]
+			# Check for corresponding soil mask to include in workflow.sh if available
+			soil_mask = self.sensors.get_sensor_path(timestamp, sensor='vnir_soil_masks', opts=['soil_mask'])
 		outFilePath = self.sensors.create_sensor_path(timestamp, sensor=sensor_fullname)
 
 		# Invoke terraref.sh
 		logging.debug('invoking terraref.sh to create: %s' % outFilePath)
-		# subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "2", "-I", inputDirectory, "-o", outFilePath])
-		returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h", "-i",
-									  target_files['raw']['path'], "-o", outFilePath])
+		if soil_mask:
+			returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
+										  "-m", soil_mask,
+										  "-i", target_files['raw']['path'], "-o", outFilePath])
+		else:
+			returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
+										  "-i", target_files['raw']['path'], "-o", outFilePath])
 
 		# Verify outfile exists and upload to clowder
 		logging.debug('done creating output file (%s)' % (returncode))
