@@ -1,7 +1,7 @@
 // [nbr] Number of wavelengths in factory calibration of Spectralon reference
 *wvl_clb_nbr=2201;
 defdim("wvl_clb",wvl_clb_nbr);
-wvl_clb[wvl_clb]=0.0f; // [m]
+*wvl_clb[wvl_clb]=0.0f; // [m]
 wvl_clb@long_name="Wavelength of factory calibration of Spectralon reference";
 wvl_clb@standard_name="sensor_band_central_radiation_wavelength";
 wvl_clb@units="meter";

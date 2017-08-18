@@ -11,23 +11,24 @@
    Usage:
    ncap2 -v -O -S ~/terraref/extractors-hyperspectral/hyperspectral/hyperspectral_calibration.nco ${DATA}/terraref/whiteReference_raw.nc ~/foo.nc */
 
+
+
 // Declare flags as RAM variables or they will clutter output file
-*flg_tst=1s; // [flg] Test mode
-*flg_prd=0s; // [flg] Production mode
 *flg_vnir=0s; // [flg] VNIR image
 *flg_swir=0s; // [flg] SWIR image
 
-// Run in test or production mode?
-*flg_typ=flg_prd; // [enm] Run type
+// flg_typ 1 - production  2 - test 
+if (!exists(flg_typ)) *flg_typ=1; // [enm] Run type
+
 
 // Defaults for values not provided on command-line
 if(!exists(clb_nbr)) *clb_nbr=73; // [nbr] Calibration number
 //if(!exists(drc_spt)) *drc_spt="."; // [sng] Script directory
 
 // Change hyperspectral camera wavelengths from nm to m (SI)
-wavelength*=1.0e-9; // [m]
-wavelength@standard_name="radiation_wavelength";  
-wavelength@units="meter";  
+// wavelength*=1.0e-9; // [m]
+// wavelength@standard_name="radiation_wavelength";  
+// wavelength@units="meter";  
 
 /* 20161005 Set flags to separate VNIR from SWIR code when necessary */
 if(min(wavelength) < 0.5e-6){
@@ -40,25 +41,15 @@ if(min(wavelength) < 0.5e-6){
   @camera="SWIR Camera";
  } // !wavelength
 
-// Add georeferenced coordinates
-// Store x and y in double-precision in case we use lat/lon
-// If stored as meters from image or gantry corner, then single-precision might be adequate
-x@long_name="North distance from southeast corner of field";
-x@units="meter";
-x@orientation="The x-dimension (which runs north-south) spans what are called samples or pixels. The y-dimension (which runs east-west) spans what are called lines or scanlines or frames. Normal, non-calibration images have the same number of pixels (384 or 1600 for SWIR and VNIR, respectively) and a variable number of lines/frames (images) that the camera takes as the camera box moves east-west.";
-x@algorithm="Based on https://github.com/terraref/computing-pipeline/issues/144, x is derived from camera geometry including the Aperature Field-of-View (AFOV), the Horizontal Field-of-View (HFOV), and the height of the camera above the canopy (aka the Working Distance, or WD). We take WD = 2 m. Focal length (about 25 mm) is ignored in this estimate because it is much smaller than the WD. The camera geometry implies that AFOV[degrees]=2*atan(HFOV/WD). We use AFOV=21 and 44.6 degress for SWIR and VNIR, respectively. Then we solve for HFOV, and that distance is equally apportioned to 384 or 1600 pixels for SWIR or VNIR, respectively. For SWIR x = 1.93mm, for VNIR x = 1.025mm.";
 
-y@long_name="West distance from southeast corner of field";
-y@units="meter";
-y@orientation="The x-dimension (which runs north-south) spans what are called samples or pixels. The y-dimension (which runs east-west) spans what are called lines or scanlines or frames. Normal, non-calibration images have the same number of pixels (384 or 1600 for SWIR and VNIR, respectively) and a variable number of lines/frames (images) the camera takes as the camera box moves east-west.";
-y@algorithm="Based on https://github.com/terraref/computing-pipeline/issues/144. The y-dimension spans 0.9853 mm per scanline/frame (exact number is 0.98526434004512529576754637665 mm). The datestamp for each frame is stored in the *_frameindex.txt file which is archived in the time variable.";
+
 
 // Compute quality control diagnostics (also used in "guesstimate" calibration)
-xps_img_max=xps_img.max($y,$x);
+*xps_img_max=xps_img.max($y,$x);
 xps_img_max@long_name="Maximum image exposure at each wavelength";
 xps_img_max@units="Counts on scale from 0 to 2^16-1 = 65535";
 
-xps_img_min=xps_img.min($y,$x);
+*xps_img_min=xps_img.min($y,$x);
 xps_img_min@long_name="Minimum image exposure at each wavelength";
 xps_img_min@units="Counts on scale from 0 to 2^16-1 = 65535";
 
@@ -79,7 +70,7 @@ xps_img_min@units="Counts on scale from 0 to 2^16-1 = 65535";
 
 /* Interpolate factory calibration of Spectralon target to wavelength grid of current instrument (VNIR, SWIR) */
 gsl_interp_cspline(&ram_ntp_spl,wvl_clb,factory_calibrated_reflectance);
-factory_calibrated_reflectance_interpolated=float(gsl_spline_eval(ram_ntp_spl,wavelength));
+*factory_calibrated_reflectance_interpolated=float(gsl_spline_eval(ram_ntp_spl,wavelength));
 ram_delete(ram_ntp_spl);
 
 if(flg_swir){
@@ -117,25 +108,33 @@ if(flg_swir){
   // 20160908: actual values are not yet available for SWIR so we use this guesstimate
   *exposure_dark_guesstimate=ushort(10); // [cnt]
 
+  // [cnt] Exposure from Spectralon reference target
+  //if(flg_swir) xps_img_wht[wavelength]=exposure_reference_guesstimate; // Produces reflectances too small by ~10^5
+  *xps_img_wht[wavelength]=ushort(xps_img_max*(factory_calibrated_reflectance_guesstimate/maximum_plant_reflectance_guesstimate));
+  xps_img_wht@long_name="Exposure from Spectralon reference target";
+  xps_img_wht@units="Counts on scale from 0 to 2^16-1 = 65535";
+
+  // [cnt] Exposure under dark (nighttime) conditions
+  *xps_img_drk[wavelength]=xps_img_min*0.01f;
+  xps_img_drk@long_name="Exposure under dark (nighttime) conditions";
+  xps_img_drk@units="Counts on scale from 0 to 2^16-1 = 65535";
+
+  *rfl_rfr_fct[wavelength]=factory_calibrated_reflectance_guesstimate;
+  rfl_rfr_fct@long_name="Reflectance of Spectralon reference target (from factory calibration)";
+  rfl_rfr_fct@units="1";
+
+
 } // !flg_swir
 
-// [cnt] Exposure from Spectralon reference target
-//if(flg_swir) xps_img_wht[wavelength]=exposure_reference_guesstimate; // Produces reflectances too small by ~10^5
-if(flg_swir) xps_img_wht[wavelength]=ushort(xps_img_max*(factory_calibrated_reflectance_guesstimate/maximum_plant_reflectance_guesstimate));
-xps_img_wht@long_name="Exposure from Spectralon reference target";
-xps_img_wht@units="Counts on scale from 0 to 2^16-1 = 65535";
+if(flg_vnir){
 
-// [cnt] Exposure under dark (nighttime) conditions
-if(flg_swir) xps_img_drk[wavelength]=xps_img_min*0.01f;
-xps_img_drk@long_name="Exposure under dark (nighttime) conditions";
-xps_img_drk@units="Counts on scale from 0 to 2^16-1 = 65535";
+  // [frc] Reflectance of Spectralon reference target (from factory calibration)
+  // 20160908: Add angular dependence?
+  *rfl_rfr_fct[wavelength]=factory_calibrated_reflectance_interpolated;
+  rfl_rfr_fct@long_name="Reflectance of Spectralon reference target (from factory calibration)";
+  rfl_rfr_fct@units="1";
 
-// [frc] Reflectance of Spectralon reference target (from factory calibration)
-// 20160908: Add angular dependence?
-if(flg_swir) rfl_rfr_fct[wavelength]=factory_calibrated_reflectance_guesstimate;
-if(flg_vnir) rfl_rfr_fct[wavelength]=factory_calibrated_reflectance_interpolated;
-rfl_rfr_fct@long_name="Reflectance of Spectralon reference target (from factory calibration)";
-rfl_rfr_fct@units="1";
+ } //flg_vnir
 
 // [frc] = Reflectance of image (plant reflectance)
 // 20160826: Pre-assigning to zero would create additional copy and increase required memory
@@ -150,10 +149,43 @@ rfl_img@standard_name="surface_albedo";
 rfl_img@units="1";
   
 // Compute quality control diagnostics
-rfl_img_max=rfl_img.max($y,$x);
+*rfl_img_max=rfl_img.max($y,$x);
 rfl_img_max@long_name="Maximum reflectance at each wavelength";
 rfl_img_max@units="1";
 
-rfl_img_min=rfl_img.min($y,$x);
+*rfl_img_min=rfl_img.min($y,$x);
 rfl_img_min@long_name="Minimum reflectance at each wavelength";
 rfl_img_min@units="1";
+
+
+if(flg_typ == 1){
+
+  ram_delete(factory_calibrated_reflectance_interpolated);
+  ram_delete(rfl_rfr_fct);
+  ram_delete(rfl_img_min);
+  ram_delete(rfl_img_max);
+  ram_delete(xps_img_min);
+  ram_delete(xps_img_max);
+
+
+
+}else if(flg_typ == 2){
+
+  ram_write(factory_calibrated_reflectance_interpolated);
+  ram_write(rfl_rfr_fct);
+  ram_write(rfl_img_min);
+  ram_write(rfl_img_max);
+  ram_write(xps_img_min);
+  ram_write(xps_img_max);
+
+
+  ram_write(xps_img_wht);
+  ram_write(xps_img_drk);
+  xps_img_wht=xps_img_wht;
+  xps_img_drk=xps_img_drk;
+
+  xps_img=xps_img;
+
+  
+
+}

@@ -158,11 +158,13 @@ att_flg='Yes' # [sng] Add workflow-specific metadata
 clb_flg='Yes' # [sng] Calibrate data
 cmp_flg='No' # [sng] Compress and/or pack data
 hsi_flg='No' # [sng] Calculate hyperspectral indices from NetCDF file
+hsi_no_pxl_flg='No' #[sng] In the hyperspectral indices file DO NOT output pixel level indices - only averages
 jsn_flg='Yes' # [sng] Parse metadata from JSON to netCDF
 mrg_flg='Yes' # [sng] Merge JSON metadata with image data
 rip_flg='Yes' # [sng] Move to final resting place
 trn_flg='Yes' # [sng] Translate flag
 xpt_flg='No' # [sng] Experimental flag
+
 
 function fnc_usg_prn { # NB: dash supports fnc_nm (){} syntax, not function fnc_nm{} syntax
     # Print usage
@@ -206,38 +208,54 @@ if [ ${arg_nbr} -eq 0 ]; then
   fnc_usg_prn
 fi # !arg_nbr
 
-while getopts c:d:hI:i:j:m:N:n:O:o:p:T:t:u:x OPT; do
-    case ${OPT} in
-	c) dfl_lvl=${OPTARG} ;; # Compression deflate level
-	d) dbg_lvl=${OPTARG} ;; # Debugging level
-	h) hsi_flg='Yes' ;; # Create hyperspectral indices NetCDF file
-	I) drc_in=${OPTARG} ;; # Input directory
-	i) in_fl=${OPTARG} ;; # Input file
-	j) job_usr=${OPTARG} ;; # Job simultaneity
-	m) msk_fl=${OPTARG} ;;  # full filename of netCDF soil mask
-	N) ntl_out=${OPTARG} ;; # Interleave-type
-	n) nco_usr=${OPTARG} ;; # NCO options
-	O) drc_usr=${OPTARG} ;; # Output directory
-	o) out_fl=${OPTARG} ;; # Output file
-	p) par_typ=${OPTARG} ;; # Parallelism type
-	T) tmp_usr=${OPTARG} ;; # Temporary directory
-	t) typ_out=${OPTARG} ;; # Type of netCDF output
-	u) unq_usr=${OPTARG} ;; # Unique suffix
-	x) xpt_flg='Yes' ;; # EXperimental
-	\?) # Unrecognized option
-	    printf "\nERROR: Option ${fnt_bld}-$OPTARG${fnt_nrm} not allowed"
+
+OPTS=$(getopt -n "$0"  -o "c:d:hI:i:j:m:N:n:O:o:p:T:t:u:x" -- "$@")
+if [ $? -ne 0 ]; then 
+  fnc_usg_prn
+  exit 0
+fi
+eval set -- $OPTS
+
+declare -a files
+while  [ $# -gt 0 ] ; do
+    case "$1" in
+	-c) dfl_lvl="$2" ; shift 2 ;; # Compression deflate level
+	-d) dbg_lvl="$2" ; shift 2 ;; # Debugging level
+	-h) hsi_flg='Yes'; shift ;; # Create hyperspectral indices NetCDF file
+	-I) drc_in="$2" ;shift 2 ;; # Input directory
+	-i) in_fl="$2"  ; shift 2 ;; # Input file
+	-j) job_usr="$2"  ; shift 2 ;; # Job simultaneity
+	-m) msk_fl="$2"  ; shift 2 ;;  # full filename of netCDF soil mask
+	-N) ntl_out="$2"  ; shift 2 ;; # Interleave-type
+	-n) nco_usr="$2"  ; shift 2 ;; # NCO options
+	-O) drc_usr="$2"  ; shift 2 ;; # Output directory
+	-o) out_fl="$2"  ; shift 2 ;; # Output file
+	-p) par_typ="$2"  ; shift 2 ;; # Parallelism type
+	-T) tmp_usr="$2"  ; shift 2 ;; # Temporary directory
+	-t) typ_out="$2"  ; shift 2 ;; # Type of netCDF output
+	-u) unq_usr="$2"  ; shift 2 ;; # Unique suffix
+	-x) xpt_flg='Yes' ; shift  ;; # EXperimental
+        --) shift ;;
+        -*)  
+            # Unrecognized option  
+            printf "\nERROR: Option ${fnt_bld}-${1}${fnt_nrm} not allowed"
 	    fnc_usg_prn ;;
+
+        *) files=("${files[@]}" "$1") ; shift ;;
     esac
 done
-shift $((OPTIND-1)) # Advance one argument
 
-# Positional arguments remaining, if any, correspond to input and output files
-if [ -n "${1}" ]; then
-    in_fl=${1}
-fi # ${1}
-if [ -n "${2}" ]; then
-    out_fl=${2}
-fi # ${2}
+
+
+
+# Exract Input and output files from var files
+if [ "${#files[@]}" -gt 0  ]; then
+    in_fl="${files[0]}"
+fi 
+
+if [ "${#files[@]}" -gt 1 ]; then
+    out_fl="${files[1]}"
+fi 
 
 # Derived variables
 if [ -n "${drc_usr}" ]; then
@@ -552,6 +570,23 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 		exit 1
 	    fi # !err
 	fi # !dbg
+
+	if [ "${flg_vnir}" = 'Yes' ]; then
+	    # 20161114: adds exposure-appropriate calibration data to VNIR image files
+	    cmd_mrg[${fl_idx}]="ncks -A -C -v xps_img_wht,xps_img_drk ${fl_clb} ${trn_out}"
+	    if [ ${dbg_lvl} -ge 1 ]; then
+		echo ${cmd_mrg[${fl_idx}]}
+	    fi # !dbg
+	    if [ ${dbg_lvl} -ne 2 ]; then
+		eval ${cmd_mrg[${fl_idx}]}
+		if [ $? -ne 0 ] || [ ! -f ${mrg_out} ]; then
+		    printf "${spt_nm}: ERROR Failed to merge white/dark calibration with data file. Debug this:\n${cmd_mrg[${fl_idx}]}\n"
+		    exit 1
+		fi # !err
+	    fi # !dbg
+	fi # !flg_vnir
+
+
     else # !trn_flg
 	att_in=${fl_in[$fl_idx]/_raw/_raw.nc}
 	hst_att="`date`: ${cmd_ln};Skipped translation step"
@@ -603,13 +638,13 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	fi # !dbg
     fi # !jsn_flg
 
-    # Merge JSON metadata with image data
+    # First Merge add only coordinate vars
     if [ "${mrg_flg}" = 'Yes' ]; then
 	mrg_in=${jsn_out}
 	mrg_out=${att_out}
 	printf "mrg(in)  : ${mrg_in}\n"
 	printf "mrg(out) : ${mrg_out}\n"
-	cmd_mrg[${fl_idx}]="ncks -A ${mrg_in} ${mrg_out}"
+	cmd_mrg[${fl_idx}]="ncks -A -C -v wavelength,x,y ${mrg_in} ${mrg_out}"
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_mrg[${fl_idx}]}
 	fi # !dbg
@@ -620,24 +655,6 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 		exit 1
 	    fi # !err
 	fi # !dbg
-	if [ "${flg_vnir}" = 'Yes' ]; then
-	    # 20161114: Second merge adds exposure-appropriate calibration data to VNIR image files
-	    mrg_in=${fl_clb}
-	    mrg_out=${att_out}
-	    printf "mrg(in)  : ${mrg_in}\n"
-	    printf "mrg(out) : ${mrg_out}\n"
-	    cmd_mrg[${fl_idx}]="ncks -A -C -v xps_img_wht,xps_img_drk ${mrg_in} ${mrg_out}"
-	    if [ ${dbg_lvl} -ge 1 ]; then
-		echo ${cmd_mrg[${fl_idx}]}
-	    fi # !dbg
-	    if [ ${dbg_lvl} -ne 2 ]; then
-		eval ${cmd_mrg[${fl_idx}]}
-		if [ $? -ne 0 ] || [ ! -f ${mrg_out} ]; then
-		    printf "${spt_nm}: ERROR Failed to merge white/dark calibration with data file. Debug this:\n${cmd_mrg[${fl_idx}]}\n"
-		    exit 1
-		fi # !err
-	    fi # !dbg
-	fi # !flg_vnir
     fi # !mrg_flg
     
     # Calibrate
@@ -658,7 +675,10 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	drc_spt_att="@drc_spt='\"${drc_spt}\"'" 
 	# NCO_PATH environment variable required for hyperspectral_calibration.nco to find hyperspectral_spectralon_reflectance_factory.nco
 	export NCO_PATH="${drc_spt}"
-	cmd_clb[${fl_idx}]="ncap2 -A ${nco_opt} -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_in}"
+
+        cmd_clb[${fl_idx}]="ncap2 --no_cll_mth -O ${nco_opt} -v -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_out}"
+        fi        
+
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_clb[${fl_idx}]}
 	fi # !dbg
@@ -669,17 +689,18 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 		exit 1
 	    fi # !err
 	fi # !dbg
-	cmd_clb[${fl_idx}]="/bin/mv -f ${clb_in} ${clb_out}"
-	if [ ${dbg_lvl} -ge 1 ]; then
-	    echo ${cmd_clb[${fl_idx}]}
-	fi # !dbg
-	if [ ${dbg_lvl} -ne 2 ]; then
-	    eval ${cmd_clb[${fl_idx}]}
-	    if [ $? -ne 0 ] || [ ! -f ${clb_out} ]; then
-		printf "${spt_nm}: ERROR Failed to move calibrated data. Debug this:\n${cmd_clb[${fl_idx}]}\n"
-		exit 1
-	    fi # !err
-	fi # !dbg
+
+	# cmd_clb[${fl_idx}]="/bin/mv -f ${clb_in} ${clb_out}"
+	# if [ ${dbg_lvl} -ge 1 ]; then
+	#     echo ${cmd_clb[${fl_idx}]}
+	# fi # !dbg
+	# if [ ${dbg_lvl} -ne 2 ]; then
+	#     eval ${cmd_clb[${fl_idx}]}
+	#     if [ $? -ne 0 ] || [ ! -f ${clb_out} ]; then
+	# 	printf "${spt_nm}: ERROR Failed to move calibrated data. Debug this:\n${cmd_clb[${fl_idx}]}\n"
+	# 	exit 1
+	#     fi # !err
+	# fi # !dbg
 
 	# Calculate hyperspectral indices file 
 	if [ "${hsi_flg}" = 'Yes' ]; then
@@ -702,7 +723,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
             hsi_out="${out_fl/.nc/_ind.nc}"    
 	    printf "hsi(in)  : ${hsi_in}\n"
 	    printf "hsi(out) : ${hsi_out}\n"
-	    cmd_hsi[${fl_idx}]="ncap2 -O -S ${drc_spt}/hyperspectral_indices_make.nco ${hsi_in} ${hsi_out}"
+	    cmd_hsi[${fl_idx}]="ncap2 -O ${nco_opt} -v -S ${drc_spt}/hyperspectral_indices_make.nco ${hsi_in} ${hsi_out}"
 	    if [ ${dbg_lvl} -ge 1 ]; then
 		echo ${cmd_hsi[${fl_idx}]}
 	    fi # !dbg
@@ -713,9 +734,40 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 		    exit 1
 		fi # !err
 	    fi # !dbg
+
+            # if requested remove the pixel level indices  - leaving only the averages
+            if [ "$hsi_no_pxl_flg" = 'Yes' ]; then
+               hsi_tmp="${hsi_out}.tmp" 
+               ncks -x -v '.*_pxl' "$hsi_out" "$hsi_tmp"
+               rm "$hsi_out"
+               mv "$hsi_tmp" "$hsi_out"   
+            fi
+
+
 	fi # !hsi_flg
         
     fi # !clb_flg
+
+    # Second  Merge add all the JSON stuff NOT the coordinate vars - they have been added earlier
+    if [ "${mrg_flg}" = 'Yes' ]; then
+	mrg_in=${jsn_out}
+	mrg_out=${clb_out}
+	printf "mrg(in)  : ${mrg_in}\n"
+	printf "mrg(out) : ${mrg_out}\n"
+	cmd_mrg[${fl_idx}]="ncks -A -C  -v wavelength,x,y -x ${mrg_in} ${mrg_out}"
+	if [ ${dbg_lvl} -ge 1 ]; then
+	    echo ${cmd_mrg[${fl_idx}]}
+	fi # !dbg
+	if [ ${dbg_lvl} -ne 2 ]; then
+	    eval ${cmd_mrg[${fl_idx}]}
+	    if [ $? -ne 0 ] || [ ! -f ${mrg_out} ]; then
+		printf "${spt_nm}: ERROR Failed to merge JSON metadata with data file. Debug this:\n${cmd_mrg[${fl_idx}]}\n"
+		exit 1
+	    fi # !err
+	fi # !dbg
+    fi # !mrg_flg
+
+
 
     # Compress and/or pack final data file
     if [ "${cmp_flg}" = 'Yes' ]; then

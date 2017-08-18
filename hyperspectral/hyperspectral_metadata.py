@@ -183,8 +183,9 @@ class DataContainer(object):
 
         tempWavelength = netCDFHandler.createVariable("wavelength", 'f8', 'wavelength')
         setattr(tempWavelength, 'long_name', 'Hyperspectral Wavelength')
-        setattr(tempWavelength, 'units', 'nanometers')
-        tempWavelength[...] = wavelength
+        setattr(tempWavelength, 'standard_name', 'radiation_wavelength')
+        setattr(tempWavelength, 'units', 'meter')
+        tempWavelength[...] = [ fd*1.0e-9  for fd in wavelength] # convert from nano-meters to meters
         write_header_file(inputFilePath, netCDFHandler, flatten, _debug)
 
         ##### Write the data from frameIndex files to netCDF #####
@@ -292,16 +293,20 @@ class DataContainer(object):
         netCDFHandler.createDimension("x", len(geo_data["x_coordinates"]))
         x = netCDFHandler.createVariable("x", "f8", ("x",))
         x[...] = geo_data["x_coordinates"]
-        setattr(netCDFHandler.variables["x"], "units", "meters")
+        setattr(netCDFHandler.variables["x"], "units", "meter")
         setattr(netCDFHandler.variables['x'], 'reference_point', 'Southeast corner of field')
-        setattr(netCDFHandler.variables['x'], "long_name", "North-south offset from southeast corner of field")
+        setattr(netCDFHandler.variables['x'], "long_name", "North distance from southeast corner of field")
+        setattr(netCDFHandler.variables['x'], "orientation", "The x-dimension (which runs north-south) spans what are called samples or pixels. The y-dimension (which runs east-west) spans what are called lines or scanlines or frames. Normal, non-calibration images have the same number of pixels (384 or 1600 for SWIR and VNIR, respectively) and a variable number of lines/frames (images) that the camera takes as the camera box moves east-west.")
+
+        setattr(netCDFHandler.variables['x'], "algorithm","Based on https://github.com/terraref/computing-pipeline/issues/144, x is derived from camera geometry including the Aperature Field-of-View (AFOV), the Horizontal Field-of-View (HFOV), and the height of the camera above the canopy(aka the Working Distance, or WD). We take WD = 2 m. Focal length (about 25 mm) is ignored in this estimate because it is much smaller than the WD. The camera geometry implies that AFOV[degrees]=2*atan(HFOV/WD). We use AFOV=21 and 44.6 degress for SWIR and VNIR, respectively. Then we solve for HFOV, and that distance is equally apportioned to 384 or 1600 pixels for SWIR or VNIR, respectively. For SWIR x = 1.93mm, for VNIR x = 1.025mm.")
 
         netCDFHandler.createDimension("y", len(geo_data["y_coordinates"]))
         y = netCDFHandler.createVariable("y", "f8", ("y",))
         y[...] = geo_data["y_coordinates"]
-        setattr(netCDFHandler.variables["y"], "units", "meters")
-        setattr(netCDFHandler.variables['y'], 'reference_point', 'Southeast corner of field')
-        setattr(netCDFHandler.variables['y'], "long_name", "Distance west of the southeast corner of the field")
+        setattr(netCDFHandler.variables["y"], "units", "meter")
+        setattr(netCDFHandler.variables['y'], 'long_name', "West distance from southeast corner of field");
+        setattr(netCDFHandler.variables['y'], "orientation", "The x-dimension (which runs north-south) spans what are called samples or pixels. The y-dimension (which runs east-west) spans what are called lines or scanlines or frames. Normal, non-calibration images have the same number of pixels (384 or 1600 for SWIR and VNIR, respectively) and a variable number of lines/frames (images) the camera takes as the camera box moves east-west.")
+        setattr(netCDFHandler.variables['y'], "algorithm", "Based on https://github.com/terraref/computing-pipeline/issues/144. The y-dimension spans 0.9853 mm per scanline/frame (exact number is 0.98526434004512529576754637665 mm). The datestamp for each frame is stored in the *_frameindex.txt file which is archived in the time variable.")
 
         # Write latitude and longitude of bounding box
         SE, SW, NE, NW = geo_data["bounding_box"]
