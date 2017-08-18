@@ -128,7 +128,6 @@ mpi_flg='No' # [sng] Parallelize over nodes
 mtd_mk='Yes' # [sng] Process metadata
 msk_fl=''    # [sng] full canonical file name of soil mask
 nco_opt='' # [sng] NCO defaults (e.g., '-D 1')
-ncap2_tst='No' # ncap2 script in test mode
 nco_usr='' # [sng] NCO user-configurable options (e.g., '-D 2')
 nd_nbr=1 # [nbr] Number of nodes
 ntl_out='bsq' # [enm] Interleave-type of output
@@ -159,6 +158,7 @@ att_flg='Yes' # [sng] Add workflow-specific metadata
 clb_flg='Yes' # [sng] Calibrate data
 cmp_flg='No' # [sng] Compress and/or pack data
 hsi_flg='No' # [sng] Calculate hyperspectral indices from NetCDF file
+hsi_no_pxl_flg='No' #[sng] In the hyperspectral indices file DO NOT output pixel level indices - only averages
 jsn_flg='Yes' # [sng] Parse metadata from JSON to netCDF
 mrg_flg='Yes' # [sng] Merge JSON metadata with image data
 rip_flg='Yes' # [sng] Move to final resting place
@@ -208,38 +208,54 @@ if [ ${arg_nbr} -eq 0 ]; then
   fnc_usg_prn
 fi # !arg_nbr
 
-while getopts c:d:hI:i:j:m:N:n:O:o:p:T:t:u:x OPT; do
-    case ${OPT} in
-	c) dfl_lvl=${OPTARG} ;; # Compression deflate level
-	d) dbg_lvl=${OPTARG} ;; # Debugging level
-	h) hsi_flg='Yes' ;; # Create hyperspectral indices NetCDF file
-	I) drc_in=${OPTARG} ;; # Input directory
-	i) in_fl=${OPTARG} ;; # Input file
-	j) job_usr=${OPTARG} ;; # Job simultaneity
-	m) msk_fl=${OPTARG} ;;  # full filename of netCDF soil mask
-	N) ntl_out=${OPTARG} ;; # Interleave-type
-	n) nco_usr=${OPTARG} ;; # NCO options
-	O) drc_usr=${OPTARG} ;; # Output directory
-	o) out_fl=${OPTARG} ;; # Output file
-	p) par_typ=${OPTARG} ;; # Parallelism type
-	T) tmp_usr=${OPTARG} ;; # Temporary directory
-	t) typ_out=${OPTARG} ;; # Type of netCDF output
-	u) unq_usr=${OPTARG} ;; # Unique suffix
-	x) xpt_flg='Yes' ;; # EXperimental
-	\?) # Unrecognized option
-	    printf "\nERROR: Option ${fnt_bld}-$OPTARG${fnt_nrm} not allowed"
+
+OPTS=$(getopt -n "$0"  -o "c:d:hI:i:j:m:N:n:O:o:p:T:t:u:x" -- "$@")
+if [ $? -ne 0 ]; then 
+  fnc_usg_prn
+  exit 0
+fi
+eval set -- $OPTS
+
+declare -a files
+while  [ $# -gt 0 ] ; do
+    case "$1" in
+	-c) dfl_lvl="$2" ; shift 2 ;; # Compression deflate level
+	-d) dbg_lvl="$2" ; shift 2 ;; # Debugging level
+	-h) hsi_flg='Yes'; shift ;; # Create hyperspectral indices NetCDF file
+	-I) drc_in="$2" ;shift 2 ;; # Input directory
+	-i) in_fl="$2"  ; shift 2 ;; # Input file
+	-j) job_usr="$2"  ; shift 2 ;; # Job simultaneity
+	-m) msk_fl="$2"  ; shift 2 ;;  # full filename of netCDF soil mask
+	-N) ntl_out="$2"  ; shift 2 ;; # Interleave-type
+	-n) nco_usr="$2"  ; shift 2 ;; # NCO options
+	-O) drc_usr="$2"  ; shift 2 ;; # Output directory
+	-o) out_fl="$2"  ; shift 2 ;; # Output file
+	-p) par_typ="$2"  ; shift 2 ;; # Parallelism type
+	-T) tmp_usr="$2"  ; shift 2 ;; # Temporary directory
+	-t) typ_out="$2"  ; shift 2 ;; # Type of netCDF output
+	-u) unq_usr="$2"  ; shift 2 ;; # Unique suffix
+	-x) xpt_flg='Yes' ; shift  ;; # EXperimental
+        --) shift ;;
+        -*)  
+            # Unrecognized option  
+            printf "\nERROR: Option ${fnt_bld}-${1}${fnt_nrm} not allowed"
 	    fnc_usg_prn ;;
+
+        *) files=("${files[@]}" "$1") ; shift ;;
     esac
 done
-shift $((OPTIND-1)) # Advance one argument
 
-# Positional arguments remaining, if any, correspond to input and output files
-if [ -n "${1}" ]; then
-    in_fl=${1}
-fi # ${1}
-if [ -n "${2}" ]; then
-    out_fl=${2}
-fi # ${2}
+
+
+
+# Exract Input and output files from var files
+if [ "${#files[@]}" -gt 0  ]; then
+    in_fl="${files[0]}"
+fi 
+
+if [ "${#files[@]}" -gt 1 ]; then
+    out_fl="${files[1]}"
+fi 
 
 # Derived variables
 if [ -n "${drc_usr}" ]; then
@@ -660,10 +676,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	# NCO_PATH environment variable required for hyperspectral_calibration.nco to find hyperspectral_spectralon_reflectance_factory.nco
 	export NCO_PATH="${drc_spt}"
 
-        if [ "$ncap2_tst" = 'Yes' ]; then 
-	    cmd_clb[${fl_idx}]="ncap2 --no_cll_mth -O ${nco_opt} -v -s '*flg_typ=2;' -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_out}"
-        else
-            cmd_clb[${fl_idx}]="ncap2 --no_cll_mth -O ${nco_opt} -v -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_out}"
+        cmd_clb[${fl_idx}]="ncap2 --no_cll_mth -O ${nco_opt} -v -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_out}"
         fi        
 
 	if [ ${dbg_lvl} -ge 1 ]; then
@@ -721,6 +734,16 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 		    exit 1
 		fi # !err
 	    fi # !dbg
+
+            # if requested remove the pixel level indices  - leaving only the averages
+            if [ "$hsi_no_pxl_flg" = 'Yes' ]; then
+               hsi_tmp="${hsi_out}.tmp" 
+               ncks -x -v '.*_pxl' "$hsi_out" "$hsi_tmp"
+               rm "$hsi_out"
+               mv "$hsi_tmp" "$hsi_out"   
+            fi
+
+
 	fi # !hsi_flg
         
     fi # !clb_flg
