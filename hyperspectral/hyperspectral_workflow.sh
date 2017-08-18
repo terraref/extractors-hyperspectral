@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 
 # Purpose: Convert raw imagery from 2D raster to 3D compressed netCDF annotated with metadata
 
@@ -214,6 +214,7 @@ if [ $? -ne 0 ]; then
   fnc_usg_prn
   exit 0
 fi
+
 eval set -- $OPTS
 
 declare -a files
@@ -677,7 +678,6 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	export NCO_PATH="${drc_spt}"
 
         cmd_clb[${fl_idx}]="ncap2 --no_cll_mth -O ${nco_opt} -v -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_out}"
-        fi        
 
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_clb[${fl_idx}]}
