@@ -136,6 +136,7 @@ out_xmp='test.nc4' # [sng] Output file for examples
 par_typ='bck' # [sng] Parallelism type
 typ_out='NC_USHORT' # [enm] netCDF output type
 unq_sfx=".pid${spt_pid}" # [sng] Unique suffix
+xps_img_fl='' # [sng] write Level 0 data intermediate file xps_img, xps_img_wht, xps_img_drk
 
 # Set temporary-file directory
 if [ -d '/gpfs_scratch/arpae' ]; then
@@ -209,7 +210,8 @@ if [ ${arg_nbr} -eq 0 ]; then
 fi # !arg_nbr
 
 
-OPTS=$(getopt -n "$0"  -o "c:d:hI:i:j:m:N:n:O:o:p:T:t:u:x" -- "$@")
+OPTS=$(getopt -n "$0"  -o "c:d:hI:i:j:m:N:n:O:o:p:T:t:u:x" -l "output_xps_img:" -- "$@")
+# OPTS=$(getopt -n "$0"  -o "c:d:hI:i:j:m:N:n:O:o:p:T:t:u:x" -- "$@")
 if [ $? -ne 0 ]; then 
   fnc_usg_prn
   exit 0
@@ -237,10 +239,13 @@ while  [ $# -gt 0 ] ; do
 	-u) unq_usr="$2"  ; shift 2 ;; # Unique suffix
 	-x) xpt_flg='Yes' ; shift  ;; # EXperimental
         --) shift ;;
+         --output_xps_img) xps_img_fl="$2" ; shift 2 ;;  
         -*)  
             # Unrecognized option  
             printf "\nERROR: Option ${fnt_bld}-${1}${fnt_nrm} not allowed"
 	    fnc_usg_prn ;;
+ 
+        # --output_xps_img) xps_img_fl="$2" ; shift 2 ;;  
 
         *) files=("${files[@]}" "$1") ; shift ;;
     esac
@@ -638,6 +643,41 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	    fi # !err
 	fi # !dbg
     fi # !jsn_flg
+
+    #create intermediate file of vars xps_img, xps_img_wht, xps_img_drk and coords x,y. wavelength
+    if [ -n "$xps_img_fl" ]; then  
+
+       xps_in="${att_out}"
+       
+       if [ "$fl_nbr" -eq 1 ];then    
+          xps_out="$xps_img_fl";   
+       else
+          xps_out= "$(pathname $xps_img_fl) / $(basename $out_fl)"
+          # remove ".nc"
+          xps_out="${xps_out%.nc}"
+          # add xps_wht.nc             
+          xps_out="${xps_out}_xps_img.nc}" 
+       fi
+
+       printf "xps(in)  : ${xps_in}\n"
+       printf "xps(out) : ${xps_out}\n"
+
+ 
+       cmd_xps[${fl_idx}]="cp \"${xps_in}\" \"${xps_out}\"  && ncks -A -C -v wavelength,x,y \"${jsn_out}\" \"${xps_out}\""     
+
+       if [ ${dbg_lvl} -ge 1 ]; then
+	   echo ${cmd_xps[${fl_idx}]} 
+       fi # !dbg
+       if [ ${dbg_lvl} -ne 2 ]; then
+	   eval ${cmd_xps[${fl_idx}]}
+	   if [ $? -ne 0 ] || [ ! -f ${xps_out} ]; then
+	       printf "${spt_nm}: ERROR Failed to copy netcdf file and add coord vars. Debug this:\n${cmd_xps[${fl_idx}]}\n"
+	       exit 1
+	   fi # !err
+       fi # !dbg
+
+
+    fi
 
     # First Merge add only coordinate vars
     if [ "${mrg_flg}" = 'Yes' ]; then
