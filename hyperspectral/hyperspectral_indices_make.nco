@@ -12,7 +12,7 @@
   
    flg_abr - if set then calculate the averages before the ratio step  (default 0)
 
-   flg_rba - if set then calculate the ratio (pixels) before the average step  (default 1)
+   flg_agg - if set then calculate min, max avg for each index  (default 0)
   
    flg_mss - set the _FillValue 1.0e36 to all values in selected reflectances where value <=0.0f (default 1)
     
@@ -25,7 +25,7 @@
 */
    
 
-// copy over coordinate here (so they end up at start (maybe ?)
+// copy over coordinate here (so they end up at start of netcdf file (maybe ?)
 x=x;
 y=y;
 wavelength=wavelength;
@@ -317,7 +317,7 @@ if(flg_std){
     TCARI_OSAVI@abr=TCARI@abr/OSAVI@abr;
 
 
-  CarChap_=R760/R500;
+  CarChap=R760/R500;
   push(&@ind_lst, "CarChap"s);
   CarChap@long_name="Carotenoid index (Chappelle)";
   CarChap@standard_name="carotenoid_index_(chappelle)";
@@ -733,7 +733,7 @@ if(flg_ngi){
   if(flg_abr)
       R740_avg / R720_avg;
 
-  VOG2_= (R734 - R747) / (R715 + R726);
+  VOG2 = (R734 - R747) / (R715 + R726);
   push(&@ind_lst, "VOG2"s);
   VOG2@long_name="Vogelmann Red Edge Index 2 [Vogelmann et al. (1993)]";
   if(flg_abr)
@@ -1050,7 +1050,7 @@ if(flg_mi){
      Crt1@avg = R695_avg / R420_avg;
 
   
-  Crt2_pxl = R695 / R760;
+  Crt2= R695 / R760;
   push(&@ind_lst, "Crt2"s);
   Crt2@long_name="Carter Index 2 [Carter (1996)]";
   if(flg_abr)
@@ -1088,10 +1088,7 @@ if(flg_mi){
 
 
 
-/* create avg from pixel formula 
- this creates the vars NDVI, SR, OSAVI by taking average of the vars NDVI_pxl, SR_pxl, OSAVI_pxl  
- and also min,max that is NDVI@min, NDVI@max, SR@min, SR@max, OSAVI@min, OSAVI@max ...,*/
-
+/* create avg,min.max  from full field index - var names fro above are stored  in @ind_lst */
 if(flg_agg){ 
   /* nb sz and idx are already RAM vars */
 
