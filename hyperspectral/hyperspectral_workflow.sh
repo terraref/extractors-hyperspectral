@@ -162,6 +162,7 @@ hsi_flg='No' # [sng] Calculate hyperspectral indices from NetCDF file
 hsi_no_pxl_flg='No' #[sng] In the hyperspectral indices file DO NOT output pixel level indices - only averages
 jsn_flg='Yes' # [sng] Parse metadata from JSON to netCDF
 mrg_flg='Yes' # [sng] Merge JSON metadata with image data
+new_clb_flg='No' # [sng] use new calibration Method
 rip_flg='Yes' # [sng] Move to final resting place
 trn_flg='Yes' # [sng] Translate flag
 xpt_flg='No' # [sng] Experimental flag
@@ -210,7 +211,7 @@ if [ ${arg_nbr} -eq 0 ]; then
 fi # !arg_nbr
 
 
-OPTS=$(getopt -n "$0"  -o "c:d:hI:i:j:m:N:n:O:o:p:T:t:u:x" -l "output_xps_img:" -- "$@")
+OPTS=$(getopt -n "$0"  -o "c:d:hI:i:j:m:N:n:O:o:p:T:t:u:x" -l "output_xps_img:,new_clb_mth,new_calibration_method" -- "$@")
 # OPTS=$(getopt -n "$0"  -o "c:d:hI:i:j:m:N:n:O:o:p:T:t:u:x" -- "$@")
 if [ $? -ne 0 ]; then 
   fnc_usg_prn
@@ -240,6 +241,8 @@ while  [ $# -gt 0 ] ; do
 	-x) xpt_flg='Yes' ; shift  ;; # EXperimental
         --) shift ;;
          --output_xps_img) xps_img_fl="$2" ; shift 2 ;;  
+         --new_clb_mth) new_clb_flg='Yes' ; shift  ;;  
+         --new_calibration_method) new_clb_flg='Yes' ; shift  ;;  
         -*)  
             # Unrecognized option  
             printf "\nERROR: Option ${fnt_bld}-${1}${fnt_nrm} not allowed"
@@ -577,22 +580,6 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	    fi # !err
 	fi # !dbg
 
-	if [ "${flg_vnir}" = 'Yes' ]; then
-	    # 20161114: adds exposure-appropriate calibration data to VNIR image files
-	    cmd_mrg[${fl_idx}]="ncks -A -C -v xps_img_wht,xps_img_drk ${fl_clb} ${trn_out}"
-	    if [ ${dbg_lvl} -ge 1 ]; then
-		echo ${cmd_mrg[${fl_idx}]}
-	    fi # !dbg
-	    if [ ${dbg_lvl} -ne 2 ]; then
-		eval ${cmd_mrg[${fl_idx}]}
-		if [ $? -ne 0 ] || [ ! -f ${mrg_out} ]; then
-		    printf "${spt_nm}: ERROR Failed to merge white/dark calibration with data file. Debug this:\n${cmd_mrg[${fl_idx}]}\n"
-		    exit 1
-		fi # !err
-	    fi # !dbg
-	fi # !flg_vnir
-
-
     else # !trn_flg
 	att_in=${fl_in[$fl_idx]/_raw/_raw.nc}
 	hst_att="`date`: ${cmd_ln};Skipped translation step"
@@ -644,40 +631,47 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	fi # !dbg
     fi # !jsn_flg
 
-    #create intermediate file of vars xps_img, xps_img_wht, xps_img_drk and coords x,y. wavelength
-    if [ -n "$xps_img_fl" ]; then  
 
-       xps_in="${att_out}"
-       
-       if [ "$fl_nbr" -eq 1 ];then    
-          xps_out="$xps_img_fl";   
-       else
-          xps_out= "$(pathname $xps_img_fl) / $(basename $out_fl)"
-          # remove ".nc"
-          xps_out="${xps_out%.nc}"
-          # add xps_wht.nc             
-          xps_out="${xps_out}_xps_img.nc}" 
-       fi
+    # in almost all senario's this MUST be called
+    if [ "${flg_vnir}" = 'Yes' ]; then
 
-       printf "xps(in)  : ${xps_in}\n"
-       printf "xps(out) : ${xps_out}\n"
+                
+        if [ "${new_clb_flg}" = 'Yes' ]; then
+            #grab first zenith angle from jsn merged data from above
+            zn=$( ncks -s "%f" -H -d time,0 -v solar_zenith_angle "${jsn_out}" )   
+            if [ "$?" -ne 0 ]; then 
+               printf "${spt_nm}: ERROR Failed to grab first calibration angle. from \"${jsn_out}\""       
+               exit 1
+            fi
 
+	    ncks -A -C  ${nco_opt} -v xps_img_drk "${fl_clb}" "${att_out}"
+            if [ "$?" -ne 0 ]; then 
+               printf "${spt_nm}: ERROR Failed grab xps_img_drk. from \"${fl_clb}\""       
+               exit 1
+            fi
+
+
+            cmd_int[${fl_idx}]="ncap2 ${nco_opt} -A -v -C -s '*zd=$zn; *exp=$xps_tm; *trg=95;' -S \"${drc_spt}/hyperspectral_zn_xps_img_wht.nco\"  \"${drc_spt}/xps_img_wht_zn_exp_trg.nc\"  \"${att_out}\""      
+
+        else   
+	    # 20161114: adds exposure-appropriate calibration data to VNIR image files
+	    cmd_int[${fl_idx}]="ncks -A -C -v xps_img_wht,xps_img_drk ${fl_clb} ${att_out}"
+        fi
  
-       cmd_xps[${fl_idx}]="cp \"${xps_in}\" \"${xps_out}\"  && ncks -A -C -v wavelength,x,y \"${jsn_out}\" \"${xps_out}\""     
+	if [ ${dbg_lvl} -ge 1 ]; then
+	    echo ${cmd_int[${fl_idx}]}
+	fi # !dbg
+	if [ ${dbg_lvl} -ne 2 ]; then
+	    eval ${cmd_int[${fl_idx}]}
+	    if [ $? -ne 0 ] || [ ! -f ${mrg_out} ]; then
+		printf "${spt_nm}: ERROR Failed to merge white/dark calibration with data file. Debug this:\n${cmd_int[${fl_idx}]}\n"
+		exit 1
+	    fi # !err
+	fi # !dbg
+    fi # !flg_vnir
 
-       if [ ${dbg_lvl} -ge 1 ]; then
-	   echo ${cmd_xps[${fl_idx}]} 
-       fi # !dbg
-       if [ ${dbg_lvl} -ne 2 ]; then
-	   eval ${cmd_xps[${fl_idx}]}
-	   if [ $? -ne 0 ] || [ ! -f ${xps_out} ]; then
-	       printf "${spt_nm}: ERROR Failed to copy netcdf file and add coord vars. Debug this:\n${cmd_xps[${fl_idx}]}\n"
-	       exit 1
-	   fi # !err
-       fi # !dbg
 
 
-    fi
 
     # First Merge add only coordinate vars
     if [ "${mrg_flg}" = 'Yes' ]; then
@@ -697,6 +691,45 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	    fi # !err
 	fi # !dbg
     fi # !mrg_flg
+
+
+
+    #create intermediate file of vars xps_img, xps_img_wht, xps_img_drk and coords x,y. wavelength
+    if [ -n "$xps_img_fl" ]; then  
+
+       xps_in="${att_out}"
+       
+       if [ "$fl_nbr" -eq 1 ];then    
+          xps_out="$xps_img_fl";   
+       else
+          xps_out= "$(pathname $xps_img_fl) / $(basename $out_fl)"
+          # remove ".nc"
+          xps_out="${xps_out%.nc}"
+          # add xps_wht.nc             
+          xps_out="${xps_out}_xps_img.nc}" 
+       fi
+
+       printf "xps(in)  : ${xps_in}\n"
+       printf "xps(out) : ${xps_out}\n"
+
+ 
+       # cmd_xps[${fl_idx}]="cp \"${xps_in}\" \"${xps_out}\"  && ncks -A -C -v wavelength,x,y \"${jsn_out}\" \"${xps_out}\""     
+       cmd_xps[${fl_idx}]="cp \"${xps_in}\" \"${xps_out}\""     
+
+       if [ ${dbg_lvl} -ge 1 ]; then
+	   echo ${cmd_xps[${fl_idx}]} 
+       fi # !dbg
+       if [ ${dbg_lvl} -ne 2 ]; then
+	   eval ${cmd_xps[${fl_idx}]}
+	   if [ $? -ne 0 ] || [ ! -f ${xps_out} ]; then
+	       printf "${spt_nm}: ERROR Failed to copy netcdf file and add coord vars. Debug this:\n${cmd_xps[${fl_idx}]}\n"
+	       exit 1
+	   fi # !err
+       fi # !dbg
+
+
+    fi
+
     
     # Calibrate
     if [ "${clb_flg}" = 'Yes' ]; then
