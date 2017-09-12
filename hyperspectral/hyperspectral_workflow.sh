@@ -634,7 +634,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 
     # in almost all senario's this MUST be called
     if [ "${flg_vnir}" = 'Yes' ]; then
-
+        sun_flg='No'   
                 
         if [ "${new_clb_flg}" = 'Yes' ]; then
             #grab first zenith angle from jsn merged data from above
@@ -649,9 +649,19 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
                printf "${spt_nm}: ERROR Failed grab xps_img_drk. from \"${fl_clb}\""       
                exit 1
             fi
+                             
 
-
-            cmd_int[${fl_idx}]="ncap2 ${nco_opt} -A -v -C -s '*zd=$zn; *exp=$xps_tm; *trg=95;' -S \"${drc_spt}/hyperspectral_zn_xps_img_wht.nco\"  \"${drc_spt}/xps_img_wht_zn_exp_trg.nc\"  \"${att_out}\""      
+            if [ "$sun_flg" = 'Yes' ]; then
+               wht_fl='xps_img_wht_zn_exp_trg_pm.nc'
+            else
+               wht_fl='xps_img_wht_zn_exp_trg_am.nc'  
+            fi    
+     
+            if [ ${dbg_lvl} -gt 2 ]; then 
+               	printf "${spt_nm}: Debug new calibration. zn=${zn} exp=${exp_tm}\n"
+            fi 
+            # solar zenith angle is in degrees -zenith in xps_img_wht_zn_exp_trg_{am,pm}.nc is cos(zenith) 
+            cmd_int[${fl_idx}]="ncap2 ${nco_opt} -A -v -C -s '*zd=cos($zn*3.14159265358/180.0); *exp=$xps_tm; *trg=95;' -S \"${drc_spt}/hyperspectral_zn_xps_img_wht.nco\"  \"${drc_spt}/${wht_fl}\"  \"${att_out}\""      
 
         else   
 	    # 20161114: adds exposure-appropriate calibration data to VNIR image files
