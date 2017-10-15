@@ -661,7 +661,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
                	printf "${spt_nm}: Debug new calibration. zn=${zn} exp=${exp_tm}\n"
             fi 
             # solar zenith angle is in degrees -zenith in xps_img_wht_zn_exp_trg_{am,pm}.nc is cos(zenith) 
-            cmd_int[${fl_idx}]="ncap2 ${nco_opt} -A -v -C -s '*zd=cos($zn*3.14159265358/180.0); *exp=$xps_tm; *trg=95;' -S \"${drc_spt}/hyperspectral_zn_xps_img_wht.nco\"  \"${drc_spt}/${wht_fl}\"  \"${att_out}\""      
+            cmd_int[${fl_idx}]="ncap2 ${nco_opt} -A -v -C -s '*zd=cos($zn*3.14159265358/180.0); *exp=$xps_tm; *trg=48;' -S \"${drc_spt}/hyperspectral_zn_xps_img_wht.nco\"  \"${drc_spt}/${wht_fl}\"  \"${att_out}\""      
 
         else   
 	    # 20161114: adds exposure-appropriate calibration data to VNIR image files
