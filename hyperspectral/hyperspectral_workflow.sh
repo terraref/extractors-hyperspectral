@@ -100,6 +100,9 @@ done
 drc_nco="$( cd -P "$( dirname "${nco_exe}" )" && pwd )"
 nco_vrs=$(ncks --version 2>&1 >/dev/null | grep NCO | awk '{print $5}')
 
+# Hard coded  location to the concatenated env-log directories
+drc_envlog='/gpfs/largeblockFS/projects/arpae/terraref/sites/ua-mac/Level_1/envlog_netcdf'
+
 # When running in a terminal window (not in an non-interactive batch queue)...
 if [ -n "${TERM}" ]; then
     # Set fonts for legibility
@@ -634,7 +637,6 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 
     # in almost all senario's this MUST be called
     if [ "${flg_vnir}" = 'Yes' ]; then
-        sun_flg='No'   
                 
         if [ "${new_clb_flg}" = 'Yes' ]; then
             #grab first zenith angle from jsn merged data from above
@@ -644,41 +646,65 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
                exit 1
             fi
 
-	    ncks -A -C  ${nco_opt} -v xps_img_drk "${fl_clb}" "${att_out}"
+            # get timestamp from frametime
+            timestamp_for_ncks=$( ncap2 -v -O -s 'timestamp=strftime(frametime(0),"%Y-%m-%d %H:%m");print(timestamp,"%s");' "$jsn_out" "/tmp/foo_$$.nc")
             if [ "$?" -ne 0 ]; then 
-               printf "${spt_nm}: ERROR Failed grab xps_img_drk. from \"${fl_clb}\""       
+               printf "${spt_nm}: ERROR Failed to grab first timestamp  from \"frametime(0) in \"${jsn_out}\""       
                exit 1
-            fi
-                             
-
-            if [ "$sun_flg" = 'Yes' ]; then
-               wht_fl='xps_img_wht_zn_exp_trg_pm.nc'
-            else
-               wht_fl='xps_img_wht_zn_exp_trg_am.nc'  
-            fi    
-     
-            if [ ${dbg_lvl} -gt 2 ]; then 
-               	printf "${spt_nm}: Debug new calibration. zn=${zn} exp=${exp_tm}\n"
             fi 
-            # solar zenith angle is in degrees -zenith in xps_img_wht_zn_exp_trg_{am,pm}.nc is cos(zenith) 
-            cmd_int[${fl_idx}]="ncap2 ${nco_opt} -A -v -C -s '*zd=cos($zn*3.14159265358/180.0); *exp=$xps_tm; *trg=48;' -S \"${drc_spt}/hyperspectral_zn_xps_img_wht.nco\"  \"${drc_spt}/${wht_fl}\"  \"${att_out}\""      
+         
+            # create envlog path & filename -     2017-08-11/envlog_netcdf_L1_ua-mac_2017-08-11.nc 
+            envlog_fl=$( ncap2 -v -O -s 'regular_time=strftime(frametime(0),"%Y-%m-%d/envlog_netcdf_L1_ua-mac_%Y-%m-%d.nc");print(regular_time,"%s");' "$jsn_out" "/tmp/foo_$$.nc")
+            envlog_fl="${drc_envlog}/${envlog_fl}"    
+      
+            if [ "$?" -ne 0 ]; then 
+               printf "${spt_nm}: ERROR Failed to create \"envlog_path_file\"   from \"frametime(0) in \"${jsn_out}\""       
+               exit 1
+            fi          
 
+            if [ ! -e "${envlog_fl}" ]; then 
+               printf "${spt_nm}: ERROR Failed to find/read the env-log file at \"${envlog_fl}\""       
+               exit 1
+            fi          
+
+
+            if [ ${dbg_lvl} -gt 2 ]; then 
+               	printf "${spt_nm}: Debug new calibration. zn=${zn} exp=${xps_tm} timestamp_for_ncks=${timestamp_for_ncks} envlog_fl=${envlog_fl}\n"
+            fi         
+                 
+            #copy theblob.nc to att_out 
+            ncks -A  "${drc_spt}/theblob.nc" "${att_out}" 
+            [ "$?" -ne 0 ] && echo "$0: problem copying theblob\n" && exit 1               
+
+            # for now the target is hard coded to 48%            
+            ncap2  -A -v  -s "*zd=${zn} ;*trg=48; *expr=${xps_tm};" -S  "${drc_spt}/cst_cnv_trg_mk.nco" "${drc_spt}/cst_cnv_trg.nc" "${att_out}"              
+            [ "$?" -ne 0 ] && echo "$0: problem getting cst_cnv_trg from nc file \n" && exit 1
+               
+            # copy flx_spc_dwn from environmental logger 
+            ncks -A -C -v flx_spc_dwn -d time,"$timestamp_for_ncks" "$envlog_fl" "${att_out}"
+            [ "$?" -ne 0 ] && echo "$0: problem extracting env-log from $envlog_fl \n" && exit 1
+  
+            #reinterpolate down-welling to wavelength   
+            ncap2 -A -v -s '*sz=$wavelength.size' -s '*idx=0' -s 'for(idx=0; idx < sz; idx++) flx_dwn_spc_img(idx)=flx_spc_dwn(0, wavelength_wvl_lgr_ind(idx));' -s 'where(flx_dwn_spc_img<=0.0f) flx_dwn_spc_img=1.0e36f' -s 'flx_dwn_spc_img.set_miss(1.0e36f)' "$att_out" "$att_out"        
+            
+            [ "$?" -ne 0 ] && echo "$0: problem reinterpolating down-welling \n" && exit 1  
+                          
         else   
 	    # 20161114: adds exposure-appropriate calibration data to VNIR image files
 	    cmd_int[${fl_idx}]="ncks -A -C -v xps_img_wht,xps_img_drk ${fl_clb} ${att_out}"
-        fi
- 
-	if [ ${dbg_lvl} -ge 1 ]; then
-	    echo ${cmd_int[${fl_idx}]}
-	fi # !dbg
-	if [ ${dbg_lvl} -ne 2 ]; then
-	    eval ${cmd_int[${fl_idx}]}
-	    if [ $? -ne 0 ] || [ ! -f ${mrg_out} ]; then
-		printf "${spt_nm}: ERROR Failed to merge white/dark calibration with data file. Debug this:\n${cmd_int[${fl_idx}]}\n"
-		exit 1
-	    fi # !err
-	fi # !dbg
-    fi # !flg_vnir
+            if [ ${dbg_lvl} -ge 1 ]; then
+		echo ${cmd_int[${fl_idx}]}
+	    fi # !dbg
+	    if [ ${dbg_lvl} -ne 2 ]; then
+		eval ${cmd_int[${fl_idx}]}
+		if [ $? -ne 0 ] || [ ! -f ${mrg_out} ]; then
+		    printf "${spt_nm}: ERROR Failed to merge white/dark calibration with data file. Debug this:\n${cmd_int[${fl_idx}]}\n"
+		    exit 1
+		fi # !err  
+            fi
+	fi    
+
+   fi # !flg_vnir
 
 
 
@@ -726,7 +752,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
        # cmd_xps[${fl_idx}]="cp \"${xps_in}\" \"${xps_out}\"  && ncks -A -C -v wavelength,x,y \"${jsn_out}\" \"${xps_out}\""     
        cmd_xps[${fl_idx}]="cp \"${xps_in}\" \"${xps_out}\""     
 
-       if [ ${dbg_lvl} -ge 1 ]; then
+      if [ ${dbg_lvl} -ge 1 ]; then
 	   echo ${cmd_xps[${fl_idx}]} 
        fi # !dbg
        if [ ${dbg_lvl} -ne 2 ]; then
@@ -760,8 +786,12 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	# NCO_PATH environment variable required for hyperspectral_calibration.nco to find hyperspectral_spectralon_reflectance_factory.nco
 	export NCO_PATH="${drc_spt}"
 
-        cmd_clb[${fl_idx}]="ncap2 --no_cll_mth -O ${nco_opt} -v -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_out}"
-
+        if [ "${new_clb_flg}" = 'Yes' ]; then
+            cmd_clb[${fl_idx}]="ncap2 --no_cll_mth -O ${nco_opt} -v -S ${drc_spt}/hyperspectral_calibration_new.nco ${clb_in} ${clb_out}"
+        else
+            cmd_clb[${fl_idx}]="ncap2 --no_cll_mth -O ${nco_opt} -v -S ${drc_spt}/hyperspectral_calibration.nco ${clb_in} ${clb_out}"
+       fi 
+ 
 	if [ ${dbg_lvl} -ge 1 ]; then
 	    echo ${cmd_clb[${fl_idx}]}
 	fi # !dbg
