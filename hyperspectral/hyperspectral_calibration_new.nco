@@ -3,7 +3,7 @@
 
   rfl_trg=0.48f;
   rfl_img= rfl_trg / cst_cnv_trg_nw.float() * ( xps_img.float() / flx_dwn_spc_img.float() );    
-  rfl.set_miss(1.0e36f);
+  rfl_img.set_miss(1.0e36f);
   
   rfl_img@long_name="Reflectance of image";
   rfl_img@standard_name="surface_albedo";
