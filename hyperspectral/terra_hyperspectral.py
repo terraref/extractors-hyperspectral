@@ -169,10 +169,10 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		if os.path.exists(outFilePath):
 			if returncode == 0:
 				if outFilePath not in resource['local_paths']:
-					target_dsid = build_dataset_hierarchy(connector, host, secret_key, self.clowderspace,
+					target_dsid = build_dataset_hierarchy(host, secret_key, self.clowder_user, self.clowder_pass, self.clowderspace,
 														  self.sensors.get_display_name(sensor=sensor_fullname),
 														  timestamp[:4], timestamp[:7], timestamp[:10],
-														  leaf_ds_name=resource['dataset_info']['name'])
+														  leaf_ds_name=self.sensors.get_display_name(sensor=sensor_fullname)+' - '+timestamp)
 
 					logging.info('uploading %s' % outFilePath)
 					upload_to_dataset(connector, host, secret_key, target_dsid, outFilePath)
@@ -191,7 +191,7 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 			# TODO: Create CSV using ndviVal as primary key
 			tmp_csv = 'traits.csv'
 			plot_no = 'Full Field'
-			csv_header = 'local_datetime,canopy_cover,access_level,species,site,' \
+			csv_header = 'local_datetime,NDVI705,access_level,species,site,' \
 						 'citation_author,citation_year,citation_title,method'
 			csv_vals = '%s,%s,2,Sorghum bicolor,%s,"Butowsky, Henry",2016,' \
 					   'Maricopa Field Station Data and Metadata,Hyperspectral NDVI705 Indices' % (
