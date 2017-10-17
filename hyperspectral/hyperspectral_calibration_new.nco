@@ -1,0 +1,26 @@
+  dbg_flg=0;
+
+
+  rfl_trg=0.48f;
+  rfl_img= rfl_trg / cst_cnv_trg_nw.float() * ( xps_img.float() / flx_dwn_spc_img.float() );    
+  rfl_img.set_miss(1.0e36f);
+  
+  rfl_img@long_name="Reflectance of image";
+  rfl_img@standard_name="surface_albedo";
+  rfl_img@units="1";
+ 
+  // Compute quality control diagnostics
+  if(dbg_flg) 
+  { 
+    rfl_img_max=rfl_img.max($y,$x);
+    rfl_img_max@long_name="Maximum reflectance at each wavelength";
+    rfl_img_max@units="1";
+
+    rfl_img_min=rfl_img.min($y,$x);
+    rfl_img_min@long_name="Minimum reflectance at each wavelength";
+    rfl_img_min@units="1";
+
+    rfl_img_avg=rfl_img.avg($y,$x);
+    rfl_img_avg@long_name="Average reflectance at each wavelength";
+    rfl_img_avg@units="1";
+  }

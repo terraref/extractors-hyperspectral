@@ -304,6 +304,7 @@ class DataContainer(object):
         y = netCDFHandler.createVariable("y", "f8", ("y",))
         y[...] = geo_data["y_coordinates"]
         setattr(netCDFHandler.variables["y"], "units", "meter")
+        setattr(netCDFHandler.variables['y'], 'reference_point', 'Southeast corner of field')
         setattr(netCDFHandler.variables['y'], 'long_name', "West distance from southeast corner of field");
         setattr(netCDFHandler.variables['y'], "orientation", "The x-dimension (which runs north-south) spans what are called samples or pixels. The y-dimension (which runs east-west) spans what are called lines or scanlines or frames. Normal, non-calibration images have the same number of pixels (384 or 1600 for SWIR and VNIR, respectively) and a variable number of lines/frames (images) the camera takes as the camera box moves east-west.")
         setattr(netCDFHandler.variables['y'], "algorithm", "Based on https://github.com/terraref/computing-pipeline/issues/144. The y-dimension spans 0.9853 mm per scanline/frame (exact number is 0.98526434004512529576754637665 mm). The datestamp for each frame is stored in the *_frameindex.txt file which is archived in the time variable.")

@@ -1,0 +1,78 @@
+// linear interpolation of zenith angle
+// usage ncap2 -v -O -s 'zd=30.0; exp=25; trg=95; -S hyperspectral_zn.nco xps_img_wht_zn_exp_trg.nc xps_img_wht.nc
+
+
+// remember min_cords returns -1 if out of bounds
+if( zd< zenith(0)) 
+  zd=zenith(0);  
+else if( zd> zenith(-1) )
+  zd=zenith(-1);
+*zi=min_coords(zenith,zd);
+
+// remeber min_cords returns -1 if out of bounds
+*expi=min_coords(exposure,exp);
+// out of bounds
+if( expi==-1 ) {
+  // to little
+  if( exp< exposure(0) ) 
+      expi=0;   
+  // too much
+  else
+    expi=$exposure.size-1;
+
+  print("expi out of bounds(exposure) using the value ");
+  print(exposure(expi),"%d\n");    
+}
+
+// remeber min_cords returns -1 if out of bounds
+*trgi=min_coords(target,trg);
+// out of bounds
+if( trgi==-1 ) {
+  // to little
+  if( exp< target(0) ) 
+      trgi=0;   
+  // too much
+  else
+    trgi=$target.size-1;
+
+  print("trgi out of bounds(target) using the value ");
+  print(target(trgi),"%d\n");    
+}
+
+
+
+
+*za=0;
+*zb=1;
+
+
+if ( zi==0 )
+{ 
+  za=0;
+  zb=1;
+}
+ else if ( zi== $zenith.size-1 )
+ {
+ za=zi-1;
+ zb=zi;
+ }
+ else if(  zd >= zenith(zi)  )
+{
+  za=zi;
+  zb=zi+1;
+}
+ else 
+{ 
+ za=zi-1;
+ zb=zi;
+}
+
+
+// get simple linear interpolation factor
+*mfactor= (zd-zenith(za)) / ( zenith(zb) -zenith(za)).float();  
+*xps_img_nw[wavelength]=0.0f;
+xps_img_nw= (1.0f-mfactor) * xps_img_wht(za,expi,trgi,:)   + mfactor* xps_img_wht(zb,expi,trgi,:);  
+
+
+{ xps_img_wht=xps_img_nw.ushort();}
+
