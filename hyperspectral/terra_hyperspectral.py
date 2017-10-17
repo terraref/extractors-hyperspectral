@@ -155,11 +155,12 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		logging.debug('invoking terraref.sh to create: %s' % outFilePath)
 		if soil_mask:
 			returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
-										  "-m", soil_mask,
+										  "-m", soil_mask, "--new_clb_math",
 										  "-i", target_files['raw']['path'], "-o", outFilePath])
 		else:
 			returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
-										  "-i", target_files['raw']['path'], "-o", outFilePath])
+										 "--new_clb_math",
+										 "-i", target_files['raw']['path'], "-o", outFilePath])
 
 		# Verify outfile exists and upload to clowder
 		logging.debug('done creating output file (%s)' % (returncode))
