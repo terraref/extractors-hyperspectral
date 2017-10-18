@@ -35,8 +35,8 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		self.bety_key = self.args.bety_key
 
 	def check_message(self, connector, host, secret_key, resource, parameters):
-		if not is_latest_file(resource):
-			return CheckMessage.ignore
+		#if not is_latest_file(resource):
+		#	return CheckMessage.ignore
 
 		# Adjust sensor path based on VNIR vs SWIR
 		if resource['dataset_info']['name'].find("SWIR") > -1:
