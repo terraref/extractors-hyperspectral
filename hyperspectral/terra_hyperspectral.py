@@ -13,7 +13,6 @@ from pyclowder.files import upload_to_dataset
 from terrautils.metadata import get_extractor_metadata, get_terraref_metadata
 from terrautils.extractors import TerrarefExtractor, is_latest_file, build_dataset_hierarchy
 from terrautils.betydb import submit_traits, add_arguments
-from terrautils.sensors import Sensor
 
 
 def add_local_arguments(parser):
