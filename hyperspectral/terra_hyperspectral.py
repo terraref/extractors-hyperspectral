@@ -38,6 +38,8 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		#if not is_latest_file(resource):
 		#	return CheckMessage.ignore
 
+		print(resource)
+		
 		# Adjust sensor path based on VNIR vs SWIR
 		if resource['dataset_info']['name'].find("SWIR") > -1:
 			sensor_fullname = 'swir_netcdf'
