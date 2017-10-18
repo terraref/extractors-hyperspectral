@@ -50,13 +50,13 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 			outFilePath = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname)
 
 			if os.path.exists(outFilePath) and not self.overwrite:
-				logging.info('skipping dataset %s, output file already exists' % resource['id'])
+				logging.getLogger(__name__).info('skipping dataset %s, output file already exists' % resource['id'])
 				return CheckMessage.ignore
 			else:
 				# Check if we have necessary metadata, either as a .json file or attached to dataset
 				md = download_metadata(connector, host, secret_key, resource['id'], self.extractor_info['name'])
 				if get_extractor_metadata(md, self.extractor_info['name']) and not self.overwrite:
-					print("skipping dataset %s, already processed" % resource['id'])
+					logging.getLogger(__name__).info("skipping dataset %s, already processed" % resource['id'])
 					return CheckMessage.ignore
 				elif get_terraref_metadata(md):
 					return CheckMessage.download
@@ -66,7 +66,7 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 							return CheckMessage.download
 					return CheckMessage.ignore
 		else:
-			logging.info('skipping dataset %s, not all input files are ready' % resource['id'])
+			logging.getLogger(__name__).info('skipping dataset %s, not all input files are ready' % resource['id'])
 			return CheckMessage.ignore
 
 	def process_message(self, connector, host, secret_key, resource, parameters):
