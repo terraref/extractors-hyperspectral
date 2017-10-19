@@ -60,6 +60,9 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 				if get_extractor_metadata(md, self.extractor_info['name']) and not self.overwrite:
 					logging.getLogger(__name__).info("skipping dataset %s, already processed" % resource['id'])
 					return CheckMessage.ignore
+				else:
+					return CheckMessage.download
+				""" TODO: Re-enable this logic after metadata is cleaned
 				elif get_terraref_metadata(md):
 					return CheckMessage.download
 				else:
@@ -67,6 +70,7 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 						if f['filename'] == 'metadata.json':
 							return CheckMessage.download
 					return CheckMessage.ignore
+				"""
 		else:
 			logging.getLogger(__name__).info('skipping dataset %s, not all input files are ready' % resource['id'])
 			return CheckMessage.ignore
