@@ -118,7 +118,7 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		if metafile == None:
 			if ds_metafile != None:
 				# Found dataset metadata, so check for the .json file alongside other files
-				logging.info("...checking for local metadata file alongside other files")
+				logging.getLogger(__name__).info("...checking for local metadata file alongside other files")
 				ds_dir = os.path.dirname(target_files['raw']['path'])
 				for ds_f in os.path.listdir(ds_dir):
 					if ds_f.endswith("_metadata.json"):
@@ -157,18 +157,20 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		outFilePath = self.sensors.create_sensor_path(timestamp, sensor=sensor_fullname)
 
 		# Invoke terraref.sh
-		logging.debug('invoking terraref.sh to create: %s' % outFilePath)
+		logging.getLogger(__name__).info('invoking hyperspectral_workflow.sh to create: %s' % outFilePath)
+		# TODO: Move this
+		script_path = "/projects/arpae/terraref/shared/extractors/extractors-hyperspectral/hyperspectral/hyperspectral_workflow.sh"
 		if soil_mask:
-			returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
+			returncode = subprocess.call(["bash", script_path, "-d", "1", "-h",
 										  "-m", soil_mask, "--new_clb_math",
 										  "-i", target_files['raw']['path'], "-o", outFilePath])
 		else:
-			returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
+			returncode = subprocess.call(["bash", script_path, "-d", "1", "-h",
 										 "--new_clb_math",
 										 "-i", target_files['raw']['path'], "-o", outFilePath])
 
 		# Verify outfile exists and upload to clowder
-		logging.debug('done creating output file (%s)' % (returncode))
+		logging.getLogger(__name__).info('done creating output file (%s)' % (returncode))
 		if returncode != 0:
 			raise ValueError('script encountered an error')
 		if os.path.exists(outFilePath):
@@ -179,12 +181,12 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 														  timestamp[:4], timestamp[:7], timestamp[:10],
 														  leaf_ds_name=self.sensors.get_display_name(sensor=sensor_fullname)+' - '+timestamp)
 
-					logging.info('uploading %s' % outFilePath)
+					logging.getLogger(__name__).info('uploading %s' % outFilePath)
 					upload_to_dataset(connector, host, secret_key, target_dsid, outFilePath)
 				self.created += 1
 				self.bytes += os.path.getsize(outFilePath)
 		else:
-			logging.error('no output file was produced')
+			logging.getLogger(__name__).error('no output file was produced')
 
 		# Send indices to betyDB
 		ind_file = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname, opts=['_ind'])
