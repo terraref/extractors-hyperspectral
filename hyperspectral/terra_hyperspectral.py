@@ -162,11 +162,11 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		script_path = "/projects/arpae/terraref/shared/extractors/extractors-hyperspectral/hyperspectral/hyperspectral_workflow.sh"
 		if soil_mask:
 			returncode = subprocess.call(["bash", script_path, "-d", "1", "-h",
-										  "-m", soil_mask, "--new_clb_math",
+										  "-m", soil_mask, "--new_clb_mth",
 										  "-i", target_files['raw']['path'], "-o", outFilePath])
 		else:
 			returncode = subprocess.call(["bash", script_path, "-d", "1", "-h",
-										 "--new_clb_math",
+										 "--new_clb_mth",
 										 "-i", target_files['raw']['path'], "-o", outFilePath])
 
 		# Verify outfile exists and upload to clowder
