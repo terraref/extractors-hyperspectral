@@ -13,12 +13,13 @@
   *t_sz=$time2.size;
   *min_idx=0;
   for(*idx=0 ; idx<t_sz; idx++) 
-    if( zenith(idx)-zd <min)
+    if( fabs(zenith(idx)-zd) <min)
     {    
-        min=zenith(idx)-zd;
+        min=fabs(zenith(idx)-zd);
         min_idx=idx;    
     }
-  *zi=min_idx;
+  
+  zi=min_idx;
   
  
 
