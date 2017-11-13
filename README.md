@@ -1,11 +1,20 @@
 # Hyperspectral extractors
 
+
+Date: 2017-11-13
+
+## Authors
+
+
+## Extractor Description 
+
 This repository contains extractors that process data originating from:
 - Hyperspec INSPECTOR SWIR camera
 - Hyperspec INSPECTOR VNIR camera
 
+## Inputs and Outputs 
 
-### Hyperspectral extractor
+
 This extractor processes HDF files into netCDF. 
 
 _Input_
@@ -17,7 +26,24 @@ _Output_
 
   - The dataset containing the _raw file will get a corresponding .nc netCDF file
 
-## Scripts:
+
+## Algorithm Description
+
+### Theoretical basis 
+
+TODO
+
+### Limitations 
+
+1. raw hyperspectral data input  should be from  a sunny day 
+2. The zenith angles used in the calibration data are: 42.2996327647, 47.5769483476, 53.0208203608, 58.3649963736, 63.979258866, 75.0731481199, 80.7132317413, 86.5222038003
+   * The closer the raw data is to these angles the better the result  
+3. The calibration routine needs some  tweaking - but indices of the form (simple ratio) ind= (A-B) / (A+B)  should be valid
+
+## Application 
+
+### Files:
+
 1. hyperspectral_workflow.sh
 
 This is the main shell script:
@@ -63,3 +89,10 @@ from it and dimesions (band, x, y) from its hdr file
 * terraref.nco
 
 NCO/ncap2 script to process and calibrate TERRAREF exposure data
+
+## Failure Conditions
+
+## Related GitHub issues and documentation
+
+1. First Calibration proceedure https://github.com/terraref/computing-pipeline/issues/281
+2. Second (radiometer based) calibration proceedure 
