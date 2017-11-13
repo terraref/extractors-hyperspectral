@@ -639,15 +639,17 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
     if [ "${flg_vnir}" = 'Yes' ]; then
                 
         if [ "${new_clb_flg}" = 'Yes' ]; then
+                   
+            sun_flg='Yes'    
             #grab first zenith angle from jsn merged data from above
             zn=$( ncks -s "%f" -H -d time,0 -v solar_zenith_angle "${jsn_out}" )   
             if [ "$?" -ne 0 ]; then 
                printf "${spt_nm}: ERROR Failed to grab first calibration angle. from \"${jsn_out}\""       
                exit 1
-            fi
+            fi 
 
             # get timestamp from frametime
-            timestamp_for_ncks=$( ncap2 -v -O -s 'timestamp=strftime(frametime(0),"%Y-%m-%d %H:%m");print(timestamp,"%s");' "$jsn_out" "/tmp/foo_$$.nc")
+            timestamp_for_ncks=$( ncap2 -v -O -s 'timestamp=strftime(frametime(0),"%Y-%m-%d %H:%M");print(timestamp,"%s");' "$jsn_out" "/tmp/foo_$$.nc")
             if [ "$?" -ne 0 ]; then 
                printf "${spt_nm}: ERROR Failed to grab first timestamp  from \"frametime(0) in \"${jsn_out}\""       
                exit 1
@@ -676,10 +678,17 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
             ncks -A  "${drc_spt}/theblob.nc" "${att_out}" 
             [ "$?" -ne 0 ] && echo "$0: problem copying theblob\n" && exit 1               
 
-            # for now the target is hard coded to 48%            
-            ncap2  -A -v  -s "*zd=${zn} ;*trg=48; *expr=${xps_tm};" -S  "${drc_spt}/cst_cnv_trg_mk.nco" "${drc_spt}/cst_cnv_trg.nc" "${att_out}"              
-            [ "$?" -ne 0 ] && echo "$0: problem getting cst_cnv_trg from nc file \n" && exit 1
-               
+            
+            if [ "$sun_flg" = "Yes" ]; then
+               #  use the pm targets - these are in bright sunlight - target fixed at 48 %
+               ncap2  -A -v  -s "*zd=${zn} ;*trg=48; *expr=${xps_tm};" -S  "${drc_spt}/cst_cnv_trg_mk.nco" "${drc_spt}/cst_cnv_trg2_pm.nc" "${att_out}"              
+               [ "$?" -ne 0 ] && echo "$0: problem getting cst_cnv_trg from nc file \n" && exit 1
+            else   
+                #  use the am targets - these are in in the shade of the gantry
+               ncap2  -A -v  -s "*zd=${zn} ;*trg=48; *expr=${xps_tm};" -S  "${drc_spt}/cst_cnv_trg_mk.nco" "${drc_spt}/cst_cnv_trg2_am.nc" "${att_out}"              
+               [ "$?" -ne 0 ] && echo "$0: problem getting cst_cnv_trg from nc file \n" && exit 1
+            fi 
+
             # copy flx_spc_dwn from environmental logger 
             ncks -A -C -v flx_spc_dwn -d time,"$timestamp_for_ncks" "$envlog_fl" "${att_out}"
             [ "$?" -ne 0 ] && echo "$0: problem extracting env-log from $envlog_fl \n" && exit 1
@@ -831,7 +840,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
                  echo "WARNING addition of the var \"SoilRemovalMask\" from the file \"${msk_fl}\" failed. Possibly the dims x, y in this file dont match the data dims. x=${xdm_nbr}, y=${ydm_nbr}"     
                fi     
             fi
-  
+
             hsi_in=${clb_out}
             hsi_out="${out_fl/.nc/_ind.nc}"    
 	    printf "hsi(in)  : ${hsi_in}\n"
