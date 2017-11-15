@@ -31,10 +31,11 @@ _Output_
 
 ### Theoretical basis 
 
-TODO
+TODO: copy / revise content from https://github.com/terraref/computing-pipeline/issues/282
 
 ### Limitations 
 
+1. only valid for 300-800nm (range of downwelling radiometer)
 1. raw hyperspectral data input  should be from  a sunny day 
 2. The zenith angles used in the calibration data are: 42.2996327647, 47.5769483476, 53.0208203608, 58.3649963736, 63.979258866, 75.0731481199, 80.7132317413, 86.5222038003
    * The closer the raw data is to these angles the better the result  
