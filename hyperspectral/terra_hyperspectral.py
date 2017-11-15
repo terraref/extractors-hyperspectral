@@ -5,102 +5,78 @@ import subprocess
 import json
 import logging
 import tempfile
-import datetime
+from netCDF4 import Dataset
 
-from pyclowder.extractors import Extractor
 from pyclowder.utils import CheckMessage
-import pyclowder.files
-import pyclowder.datasets
-import terrautils.extractors
+from pyclowder.datasets import download_metadata
+from pyclowder.files import upload_to_dataset
+from terrautils.metadata import get_extractor_metadata, get_terraref_metadata
+from terrautils.extractors import TerrarefExtractor, is_latest_file, build_dataset_hierarchy
+from terrautils.betydb import submit_traits, add_arguments
 
 
-class HyperspectralRaw2NetCDF(Extractor):
+def add_local_arguments(parser):
+	# add any additional arguments to parser
+	# self.parser.add_argument('--max', '-m', type=int, nargs='?', default=-1,
+	#                          help='maximum number (default=-1)')
+	add_arguments(parser)
+
+class HyperspectralRaw2NetCDF(TerrarefExtractor):
 	def __init__(self):
-		Extractor.__init__(self)
+		super(HyperspectralRaw2NetCDF, self).__init__()
 
-		influx_host = os.getenv("INFLUXDB_HOST", "terra-logging.ncsa.illinois.edu")
-		influx_port = os.getenv("INFLUXDB_PORT", 8086)
-		influx_db = os.getenv("INFLUXDB_DB", "extractor_db")
-		influx_user = os.getenv("INFLUXDB_USER", "terra")
-		influx_pass = os.getenv("INFLUXDB_PASSWORD", "")
-
-		# add any additional arguments to parser
-		# self.parser.add_argument('--max', '-m', type=int, nargs='?', default=-1,
-		#                          help='maximum number (default=-1)')
-		self.parser.add_argument('--overwrite', dest="force_overwrite", type=bool, nargs='?', default=False,
-								 help="whether to overwrite output file if it already exists in output directory")
-		self.parser.add_argument('--output', '-o', dest="output_dir", type=str, nargs='?',
-								 default="/home/ubuntu/sites/ua-mac/Level_1/hyperspectral",
-								 help="root directory where timestamp & output directories will be created")
-		self.parser.add_argument('--script', dest="main_script", type=str, nargs='?',
-								 default="hyperspectral_workflow.sh",
-								 help="location of hyperspectral_workflow.sh file")
-		self.parser.add_argument('--influxHost', dest="influx_host", type=str, nargs='?',
-								 default=influx_host, help="InfluxDB URL for logging")
-		self.parser.add_argument('--influxPort', dest="influx_port", type=int, nargs='?',
-								 default=influx_port, help="InfluxDB port")
-		self.parser.add_argument('--influxUser', dest="influx_user", type=str, nargs='?',
-								 default=influx_user, help="InfluxDB username")
-		self.parser.add_argument('--influxPass', dest="influx_pass", type=str, nargs='?',
-								 default=influx_pass, help="InfluxDB password")
-		self.parser.add_argument('--influxDB', dest="influx_db", type=str, nargs='?',
-								 default=influx_db, help="InfluxDB database")
+		add_local_arguments(self.parser)
 
 		# parse command line and load default logging configuration
-		self.setup()
+		self.setup(sensor='vnir_netcdf')
 
-		# setup logging for the exctractor
-		logging.getLogger('pyclowder').setLevel(logging.DEBUG)
-		logging.getLogger('__main__').setLevel(logging.DEBUG)
-
-		# assign other arguments
-		self.output_dir = self.args.output_dir
-		self.force_overwrite = self.args.force_overwrite
-		self.main_script = self.args.main_script
-		self.influx_params = {
-			"host": self.args.influx_host,
-			"port": self.args.influx_port,
-			"db": self.args.influx_db,
-			"user": self.args.influx_user,
-			"pass": self.args.influx_pass
-		}
+		# assign other argumentse
+		self.bety_url = self.args.bety_url
+		self.bety_key = self.args.bety_key
 
 	def check_message(self, connector, host, secret_key, resource, parameters):
-		if not terrautils.extractors.is_latest_file(resource):
-			return CheckMessage.ignore
+		#if not is_latest_file(resource):
+		#	return CheckMessage.ignore
+
+		logging.getLogger(__name__).info(resource)
+
+		# Adjust sensor path based on VNIR vs SWIR
+		if resource['dataset_info']['name'].find("SWIR") > -1:
+			sensor_fullname = 'swir_netcdf'
+		else:
+			sensor_fullname = 'vnir_netcdf'
 
 		if has_all_files(resource):
-			if has_output_file(resource) and not self.force_overwrite:
-				logging.info('skipping dataset %s, output file already exists' % resource['id'])
+			# Check if output already exists
+			timestamp = resource['dataset_info']['name'].split(" - ")[1]
+			outFilePath = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname)
+
+			if os.path.exists(outFilePath) and not self.overwrite:
+				logging.getLogger(__name__).info('skipping dataset %s, output file already exists' % resource['id'])
 				return CheckMessage.ignore
 			else:
 				# Check if we have necessary metadata, either as a .json file or attached to dataset
-				found_md = False
-				for f in resource['files']:
-					if f['filename'] == 'metadata.json':
-						found_md = True
-				if not found_md:
-					md = pyclowder.datasets.download_metadata(connector, host, secret_key,
-															  resource['id'], self.extractor_info['name'])
-					if len(md) > 0:
-						for m in md:
-							# Check if this extractor has already been processed
-							if 'agent' in m and 'name' in m['agent']:
-								if m['agent']['name'].find(self.extractor_info['name']) > -1:
-									print("skipping dataset %s, already processed" % resource['id'])
-									return CheckMessage.ignore
-							if 'content' in m and 'lemnatec_measurement_metadata' in m['content']:
-								found_md = True
-				if found_md:
+				md = download_metadata(connector, host, secret_key, resource['id'], self.extractor_info['name'])
+				if get_extractor_metadata(md, self.extractor_info['name']) and not self.overwrite:
+					logging.getLogger(__name__).info("skipping dataset %s, already processed" % resource['id'])
+					return CheckMessage.ignore
+				else:
 					return CheckMessage.download
+				""" TODO: Re-enable this logic after metadata is cleaned
+				elif get_terraref_metadata(md):
+					return CheckMessage.download
+				else:
+					for f in resource['files']:
+						if f['filename'] == 'metadata.json':
+							return CheckMessage.download
+					return CheckMessage.ignore
+				"""
 		else:
-			logging.info('skipping dataset %s, not all input files are ready' % resource['id'])
+			logging.getLogger(__name__).info('skipping dataset %s, not all input files are ready' % resource['id'])
 			return CheckMessage.ignore
 
 	def process_message(self, connector, host, secret_key, resource, parameters):
-		starttime = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-		created = 0
-		bytes = 0
+		self.start_message()
 
 		# Find input files in dataset
 		target_files = {
@@ -120,40 +96,35 @@ class HyperspectralRaw2NetCDF(Extractor):
 		symlinks = []
 		for f in resource['local_paths']:
 			for fileExt in target_files.keys():
-				if f.endswith(fileExt) and fileExt != '_metadata.json':
-					filedir = f.replace(os.path.basename(f), "")
-					if not last_path:
-						last_path = filedir
+				if f.endswith(fileExt):
+					if fileExt != '_metadata.json':
+						filedir = os.path.dirname(f)
+						if not last_path:
+							last_path = filedir
+						else:
+							if filedir != last_path:
+								path_match = False
+							last_path = filedir
+						target_files[fileExt] = {'filename': os.path.basename(f), 'path': f}
 					else:
-						if filedir != last_path:
-							path_match = False
-						last_path = filedir
-
-					target_files[fileExt] = {
-						'filename': os.path.basename(f),
-						'path': f
-					}
-			if f.endswith('_metadata.json') and not f.endswith('/_metadata.json'):
-				metafile = f
-			if f.endswith('/_dataset_metadata.json'):
-				ds_metafile = f
+						if f.endswith('/_dataset_metadata.json'):
+							ds_metafile = f
+						elif not f.endswith('/_metadata.json'):
+							metafile = f
+							target_files['_metadata.json'] = {'filename': os.path.basename(metafile),
+															  'path': metafile}
 
 		# Identify md file either with other dataset files, or attached to Clowder dataset
 		if metafile == None:
 			if ds_metafile != None:
 				# Found dataset metadata, so check for the .json file alongside other files
-				logging.info("...checking for local metadata file alongside other files")
-				ds_dir = target_files['raw']['path'].replace(os.path.basename(target_files['raw']['path']), "")
-				ds_files = os.path.listdir(ds_dir)
-				for ds_f in ds_files:
+				logging.getLogger(__name__).info("...checking for local metadata file alongside other files")
+				ds_dir = os.path.dirname(target_files['raw']['path'])
+				for ds_f in os.path.listdir(ds_dir):
 					if ds_f.endswith("_metadata.json"):
 						target_files['_metadata.json']['path'] = os.path.join(ds_dir, ds_f)
 			else:
-				logging.error('could not locate metadata')
-				return
-		else:
-			target_files['_metadata.json'] = {'filename': os.path.basename(metafile),
-											  'path': metafile}
+				raise ValueError('could not locate metadata for %s' % resource['id'])
 
 		# Create symlinks in one directory if inputs aren't in the same one
 		if not path_match:
@@ -164,52 +135,78 @@ class HyperspectralRaw2NetCDF(Extractor):
 					# Open the temporary file and change the JSON content format
 					with open(currf['path'], 'r') as mdfile:
 						jsondata = json.load(mdfile)
-					for j in jsondata:
-						if 'content' in j:
-							if 'lemnatec_measurement_metadata' in j['content']:
-								with open(currf['path'], 'w') as mdfile:
-									json.dump(j['content'], mdfile)
+					md = get_terraref_metadata(jsondata)
+					with open(currf['path'], 'w') as mdfile:
+						json.dump(md, mdfile)
 					newf = os.path.join(tempdir, target_files['raw']['filename'].replace("_raw","")+'_metadata.json')
 				else:
 					newf = os.path.join(tempdir, currf['filename'])
 				os.symlink(currf['path'], newf)
 				symlinks.append(newf)
 
-		# Prep output location
-		try:
-			date_portion = resource['dataset_info']['name'].split(' - ')[1].split('__')[0]
-			timestamp_portion = resource['dataset_info']['name'].split(' - ')[1]
-		except:
-			date_portion = resource['dataset_info']['name']
-			timestamp_portion = ""
 
-		outFilePath = os.path.join(self.output_dir + ("_swir" if resource['dataset_info']['name'].find("SWIR") > -1
-													  else ""),
-								   date_portion,
-								   timestamp_portion,
-								   get_output_filename(target_files['raw']['filename']))
-		out_dir = outFilePath.replace(os.path.basename(outFilePath), '')
-		if not os.path.exists(out_dir):
-			os.makedirs(out_dir)
+		# Adjust sensor path based on VNIR vs SWIR and check for soil mask
+		timestamp = resource['dataset_info']['name'].split(" - ")[1]
+		if resource['dataset_info']['name'].find("SWIR") > -1:
+			sensor_fullname = 'swir_netcdf'
+			soil_mask = None
+		else:
+			sensor_fullname = 'vnir_netcdf'
+			# Check for corresponding soil mask to include in workflow.sh if available
+			soil_mask = self.sensors.get_sensor_path(timestamp, sensor='vnir_soil_masks', opts=['soil_mask'])
+		outFilePath = self.sensors.create_sensor_path(timestamp, sensor=sensor_fullname)
 
 		# Invoke terraref.sh
-		logging.debug('invoking terraref.sh to create: %s' % outFilePath)
-		#returncode = subprocess.call(["bash", self.main_script, "-d", "2", "-I", inputDirectory, "-o", outFilePath])
-		returncode = subprocess.call(["bash", self.main_script, "-d", "1", "-h", "-i", target_files['raw']['path'], "-o", outFilePath])
+		logging.getLogger(__name__).info('invoking hyperspectral_workflow.sh to create: %s' % outFilePath)
+		# TODO: Move this
+		script_path = "/projects/arpae/terraref/shared/extractors/extractors-hyperspectral/hyperspectral/hyperspectral_workflow.sh"
+		if soil_mask:
+			returncode = subprocess.call(["bash", script_path, "-d", "1", "-h",
+										  "-m", soil_mask, "--new_clb_mth",
+										  "-i", target_files['raw']['path'], "-o", outFilePath])
+		else:
+			returncode = subprocess.call(["bash", script_path, "-d", "1", "-h",
+										 "--new_clb_mth",
+										 "-i", target_files['raw']['path'], "-o", outFilePath])
 
 		# Verify outfile exists and upload to clowder
-		logging.debug('done creating output file (%s)' % (returncode))
+		logging.getLogger(__name__).info('done creating output file (%s)' % (returncode))
 		if returncode != 0:
-			logging.error('script encountered an error')
+			raise ValueError('script encountered an error')
 		if os.path.exists(outFilePath):
 			if returncode == 0:
 				if outFilePath not in resource['local_paths']:
-					logging.info('uploading %s' % outFilePath)
-					pyclowder.files.upload_to_dataset(connector, host, secret_key, resource['id'], outFilePath)
-				created += 1
-				bytes += os.path.getsize(outFilePath)
+					target_dsid = build_dataset_hierarchy(host, secret_key, self.clowder_user, self.clowder_pass, self.clowderspace,
+														  self.sensors.get_display_name(sensor=sensor_fullname),
+														  timestamp[:4], timestamp[:7], timestamp[:10],
+														  leaf_ds_name=self.sensors.get_display_name(sensor=sensor_fullname)+' - '+timestamp)
+
+					logging.getLogger(__name__).info('uploading %s' % outFilePath)
+					upload_to_dataset(connector, host, secret_key, target_dsid, outFilePath)
+				self.created += 1
+				self.bytes += os.path.getsize(outFilePath)
 		else:
-			logging.error('no output file was produced')
+			logging.getLogger(__name__).error('no output file was produced')
+
+		# Send indices to betyDB
+		ind_file = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname, opts=['_ind'])
+		with Dataset(ind_file, "r") as netCDF_handle:
+			ndvi = netCDF_handle.get_variables_by_attributes(
+					standard_name='normalized_difference_chlorophyll_index_750_705')
+			NDVI705 = ndvi[0].getValue().ravel()[0]
+
+			# TODO: Create CSV using ndviVal as primary key
+			tmp_csv = 'traits.csv'
+			plot_no = 'Full Field'
+			csv_header = 'local_datetime,NDVI705,access_level,species,site,' \
+						 'citation_author,citation_year,citation_title,method'
+			csv_vals = '%s,%s,2,Sorghum bicolor,%s,"Butowsky, Henry",2016,' \
+					   'Maricopa Field Station Data and Metadata,Hyperspectral NDVI705 Indices' % (
+							timestamp, NDVI705, plot_no)
+			with open(tmp_csv, 'w') as c:
+				c.write(csv_header+'\n'+csv_vals)
+
+		submit_traits(tmp_csv, bety_key=self.bety_key)
 
 		# Remove symlinks and temp directory
 		for sym in symlinks:
@@ -217,9 +214,7 @@ class HyperspectralRaw2NetCDF(Extractor):
 		if tempdir:
 			os.rmdir(tempdir)
 
-		endtime = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-		terrautils.extractors.log_to_influxdb(self.extractor_info['name'], self.influx_params,
-											  starttime, endtime, created, bytes)
+		self.end_message()
 
 # Find as many expected files as possible and return the set.
 def get_all_files(resource):
@@ -244,10 +239,6 @@ def get_all_files(resource):
 
 	return target_files
 
-# Returns the output filename.
-def get_output_filename(raw_filename):
-	return '%s.nc' % raw_filename[:-len('_raw')]
-
 # Returns true if all expected files are found.
 def has_all_files(resource):
 	target_files = get_all_files(resource)
@@ -259,22 +250,12 @@ def has_all_files(resource):
 
 	return allFilesFound
 
-# Returns true if the output file is present.
-def has_output_file(resource):
-	if 'files' not in resource:
-		return False
-	if not has_all_files(resource):
-		return False
+def _produce_attr_dict(netCDF_variable_obj):
+	'''Produce a list of dictionary with attributes and value'''
+	attributes = [attr for attr in dir(netCDF_variable_obj) if isinstance(attr, unicode)]
+	result     = {name:getattr(netCDF_variable_obj, name) for name in attributes}
 
-	files = get_all_files(resource)
-	outFilename = get_output_filename(files['raw']['filename'])
-	outFileFound = False
-	for fileItem in resource['files']:
-		if outFilename == fileItem['filename']:
-			outFileFound = True
-			break
-
-	return outFileFound
+	return [dict(result.items()+ {"value":str(data)}.items()) for data in netCDF_variable_obj[...]]
 
 if __name__ == "__main__":
 	extractor = HyperspectralRaw2NetCDF()
