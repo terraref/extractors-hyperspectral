@@ -94,5 +94,8 @@ NCO/ncap2 script to process and calibrate TERRAREF exposure data
 
 ## Related GitHub issues and documentation
 
-1. First Calibration proceedure https://github.com/terraref/computing-pipeline/issues/281
-2. Second (radiometer based) calibration proceedure 
+1. [Notes from meeting on calibration options](https://docs.google.com/document/d/e/2PACX-1vRKArTMn0aU90KoFKe-HCYMuFubcW_WLUZsFCWCT2rENhitzf00tLktYm6EG2DIB3X5rSRD1A1DOZhL/pub)
+1. First (alpha) calibration proceedure https://github.com/terraref/computing-pipeline/issues/88
+2. Second (radiometer based) calibration 
+   * List of tasks https://github.com/terraref/computing-pipeline/issues/281 
+   * algorithm documentation https://github.com/terraref/computing-pipeline/issues/282
