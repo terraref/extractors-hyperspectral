@@ -178,7 +178,7 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 				if outFilePath not in resource['local_paths']:
 					target_dsid = build_dataset_hierarchy(host, secret_key, self.clowder_user, self.clowder_pass, self.clowderspace,
 														  self.sensors.get_display_name(sensor=sensor_fullname),
-														  timestamp[:4], timestamp[:7], timestamp[:10],
+														  timestamp[:4], timestamp[5:7], timestamp[8:10],
 														  leaf_ds_name=self.sensors.get_display_name(sensor=sensor_fullname)+' - '+timestamp)
 
 					logging.getLogger(__name__).info('uploading %s' % outFilePath)
