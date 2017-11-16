@@ -15,7 +15,7 @@ This repository contains extractors that process data originating from:
 ## Inputs and Outputs 
 
 
-This extractor processes HDF files into netCDF. 
+This extractor processes ENVI BIL (band-interleaved-by-line) files into netCDF. 
 
 _Input_
 
@@ -31,15 +31,15 @@ _Output_
 
 ### Theoretical basis 
 
-TODO: copy / revise content from https://github.com/terraref/computing-pipeline/issues/282
+The hyperspectral calibration procedure is documented at https://github.com/terraref/computing-pipeline/issues/282. The implementation is undergoing improvement (e.g., better target calibrations, more reliable factory calibrations, improved interpolation methods) as experience is gained.
 
 ### Limitations 
 
-1. only valid for 300-800nm (range of downwelling radiometer)
-1. raw hyperspectral data input  should be from  a sunny day 
-2. The zenith angles used in the calibration data are: 42.2996327647, 47.5769483476, 53.0208203608, 58.3649963736, 63.979258866, 75.0731481199, 80.7132317413, 86.5222038003
+1. Only valid for 300-800nm (range of downwelling radiometer)
+2. Raw hyperspectral exposures are calibrated for images in full sunlight. Other times and cloudy days are not well-tested yet. 
+3. Zenith angles used in the calibration data are: 42.3, 47.6, 53.0, 58.4, 64.0, 75.1, 80.7, 86.5
    * The closer the raw data is to these angles the better the result  
-3. The calibration routine needs some  tweaking - but indices of the form (simple ratio) ind= (A-B) / (A+B)  should be valid
+4. The calibration needs improvement to obtain accurate absolute reflectances. Environmental conditions (such as shade and specular reflection) and irregular calibration of known targets (such as tilted surfaces and field-based calibration) can bias retrieved reflectances by an unknown factor. However, the scale bias factors out of indices created as ratios of reflectances, e.g., (A-B) / (A+B).
 
 ## Application 
 
@@ -87,7 +87,7 @@ This module parses JSON formatted metadata and data and header provided by Lemna
 This module will process the data file and export a netCDF with variables 
 from it and dimesions (band, x, y) from its hdr file
 
-* terraref.nco
+* hyperspectral_calibration.nco
 
 NCO/ncap2 script to process and calibrate TERRAREF exposure data
 
@@ -96,7 +96,7 @@ NCO/ncap2 script to process and calibrate TERRAREF exposure data
 ## Related GitHub issues and documentation
 
 1. [Notes from meeting on calibration options](https://docs.google.com/document/d/e/2PACX-1vRKArTMn0aU90KoFKe-HCYMuFubcW_WLUZsFCWCT2rENhitzf00tLktYm6EG2DIB3X5rSRD1A1DOZhL/pub)
-1. First (alpha) calibration proceedure https://github.com/terraref/computing-pipeline/issues/88
-2. Second (radiometer based) calibration 
+2. First (alpha) calibration proceedure https://github.com/terraref/computing-pipeline/issues/88
+3. Second (radiometer based) calibration 
    * List of tasks https://github.com/terraref/computing-pipeline/issues/281 
-   * algorithm documentation https://github.com/terraref/computing-pipeline/issues/282
+   * Algorithm documentation https://github.com/terraref/computing-pipeline/issues/282
