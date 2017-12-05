@@ -9,4 +9,4 @@ module load python/2.7.10 pythonlibs/2.7.10 gdal-stack-2.7.10 nco
 source /projects/arpae/terraref/shared/extractors/pyenv/bin/activate
 
 # Run extractor script
-python /projects/arpae/terraref/shared/extractors/extractors-hyperspectral/hyperspectral/hyperspectral_scratch.py --input="/scratch/vnir_netcdf/vnir_pt1.txt"
+python /projects/arpae/terraref/shared/extractors/extractors-hyperspectral/hyperspectral/hyperspectral_scratch.py --input="/gpfs_scratch/vnir_netcdf/vnir_pt1.txt"

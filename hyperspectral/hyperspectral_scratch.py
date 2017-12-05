@@ -11,7 +11,7 @@ args = parser.parse_args()
 sensor = Sensors('/projects/arpae/terraref/sites', 'ua-mac', 'vnir_netcdf')
 vnir_raw = "/projects/arpae/terraref/sites/ua-mac/raw_data/VNIR"
 vnir_lv1 = "/projects/arpae/terraref/sites/ua-mac/Level_1/vnir_netcdf"
-alt_out = "/scratch/vnir_netcdf"
+alt_out = "/gpfs_scratch/vnir_netcdf"
 
 with open(args.input, 'r') as inp:
     #for date in os.listdir(vnir_raw):
@@ -30,9 +30,9 @@ with open(args.input, 'r') as inp:
                         if not os.path.isfile(lv1_out):
                             # Invoke terraref.sh
                             script_path = "/projects/arpae/terraref/shared/extractors/extractors-hyperspectral/hyperspectral/hyperspectral_workflow.sh"
-                            print(["bash", script_path, "-d", "1", "-h", "--new_clb_mth",
+                            print(" ".join(["bash", script_path, "-d", "1", "-h", "--new_clb_mth",
                                    "-i", os.path.join(ds_dir, hyperfile),
-                                   "-o", os.path.join(alt_out, date, timestamp, os.path.basename(lv1_out))])
-                            #returncode = subprocess.call(["bash", script_path, "-d", "1", "-h", "--new_clb_mth",
-                            #                                "-i", os.path.join(ds_dir, hyperfile),
-                            #                                "-o", os.path.join(alt_out, date, timestamp, os.path.basename(lv1_out))])
+                                   "-o", os.path.join(alt_out, date, timestamp, os.path.basename(lv1_out))]))
+                            subprocess.call(["bash", script_path, "-d", "1", "-h", "--new_clb_mth",
+                                                            "-i", os.path.join(ds_dir, hyperfile),
+                                                            "-o", os.path.join(alt_out, date, timestamp, os.path.basename(lv1_out))])
