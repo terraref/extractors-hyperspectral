@@ -14,16 +14,17 @@ with open(vnir_list, 'r') as inp:
 for date in vnir_dates: #os.listdir(env_log)
     date_dir = os.path.join(env_log, date)
 
-    allfiles = os.listdir(date_dir)
-    ncfiles = [os.path.join(date_dir, f) for f in allfiles if f.endswith(".nc")]
-    ncfiles.sort()
+    if os.path.isdir(date_dir):
+        allfiles = os.listdir(date_dir)
+        ncfiles = [os.path.join(date_dir, f) for f in allfiles if f.endswith(".nc")]
+        ncfiles.sort()
 
-    out_file = "envlog_netcdf_L1_ua-mac_%s.nc" % date
-    out_path = os.path.join(alt_out, date)
-    if not os.path.isdir(out_path):
-        os.makedirs(out_path)
+        out_file = "envlog_netcdf_L1_ua-mac_%s.nc" % date
+        out_path = os.path.join(alt_out, date)
+        if not os.path.isdir(out_path):
+            os.makedirs(out_path)
 
-    if not os.path.isfile(os.path.join(out_path, out_file)):
-        print("concatenating %s files from %s" % (len(ncfiles), date))
-        cmd = "ncrcat "+" ".join(ncfiles)+" "+os.path.join(out_path, out_file)
-        subprocess.call([cmd], shell=True)
+        if not os.path.isfile(os.path.join(out_path, out_file)):
+            print("concatenating %s files from %s" % (len(ncfiles), date))
+            cmd = "ncrcat "+" ".join(ncfiles)+" "+os.path.join(out_path, out_file)
+            subprocess.call([cmd], shell=True)
