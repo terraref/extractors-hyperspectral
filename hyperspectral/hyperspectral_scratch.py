@@ -36,6 +36,9 @@ with open(args.input, 'r') as inp:
                             alt_out_dir = os.path.join(alt_out, date, timestamp)
                             if not os.path.isdir(alt_out_dir):
                                 os.makedirs(alt_out_dir)
-                            subprocess.call(["bash", script_path, "-d", "1", "-h", "--new_clb_mth",
+                            try:
+                                subprocess.check_call(["bash", script_path, "-d", "1", "-h", "--new_clb_mth",
                                                             "-i", os.path.join(ds_dir, hyperfile),
                                                             "-o", os.path.join(alt_out_dir, os.path.basename(lv1_out))])
+                            except:
+                                print("ERROR on %s" % os.path.join(ds_dir, hyperfile))
