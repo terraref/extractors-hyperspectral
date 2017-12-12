@@ -27,20 +27,19 @@ with open(args.input, 'r') as inp:
                     print("FOUND RAW FILE: %s" % hyperfile)
                     # Found a raw file - do we already have inputs?
                     lv1_out = sensor.get_sensor_path(timestamp)
-                    if os.path.isdir(os.path.dirname(lv1_out)):
-                        if not os.path.isfile(lv1_out):
-                            # Invoke terraref.sh
-                            script_path = "/projects/arpae/terraref/shared/extractors/extractors-hyperspectral/hyperspectral/hyperspectral_workflow.sh"
-                            alt_out_dir = os.path.join(alt_out, date, timestamp)
-                            cmd = ["bash", script_path, "-d", "1", "-h", "--new_clb_mth",
-                                   "-i", os.path.join(ds_dir, hyperfile),
-                                   "-o", os.path.join(alt_out_dir, os.path.basename(lv1_out))]
+                    if not os.path.isfile(lv1_out):
+                        # Invoke terraref.sh
+                        script_path = "/projects/arpae/terraref/shared/extractors/extractors-hyperspectral/hyperspectral/hyperspectral_workflow.sh"
+                        alt_out_dir = os.path.join(alt_out, date, timestamp)
+                        cmd = ["bash", script_path, "-d", "1", "-h", "--new_clb_mth",
+                               "-i", os.path.join(ds_dir, hyperfile),
+                               "-o", os.path.join(alt_out_dir, os.path.basename(lv1_out))]
 
-                            if not os.path.isdir(alt_out_dir):
-                                os.makedirs(alt_out_dir)
-                            try:
-                                print(" ".join(cmd))
-                                subprocess.check_call(cmd)
-                            except:
-                                print("ERROR ON: %s" % os.path.join(ds_dir, hyperfile))
-                                continue
+                        if not os.path.isdir(alt_out_dir):
+                            os.makedirs(alt_out_dir)
+                        try:
+                            print(" ".join(cmd))
+                            subprocess.check_call(cmd)
+                        except:
+                            print("ERROR ON: %s" % os.path.join(ds_dir, hyperfile))
+                            continue
