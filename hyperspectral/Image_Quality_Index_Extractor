@@ -1,0 +1,112 @@
+"""
+# Name:        Blur Quality Metric (BQM)
+# Purpose:     To quantify the emergence of the blur effect which is estimated by a No-Reference Perceptual Blur Metric.
+#              References: Crete, Frederique, et al. "The blur effect: perception and estimation with a new no-reference 
+#                          perceptual blur metric." Human vision and electronic imaging XII. Vol. 6492. Intl. Society for Optics and Photonics, 2007.
+#              Function: This BQM measures sharpness or other artifacts related to the blur. 
+#              The output is in the range [0, 1]; 0 means sharp, 1 means blur.
+# Version:     1.0
+#
+# Created:     02/28/2018
+"""
+
+import numpy as np
+import scipy.ndimage
+import logging
+import json
+import spectral.io.envi as envi
+
+def BlurMetric(im):
+    h, v, c = im.shape
+    im = np.reshape(im, (h, v))
+    # blur kernels
+    kernel_v = np.ones((1, 9),np.float32)/9
+    kernel_h = np.transpose(kernel_v)
+    
+    # filtering
+    bv_im = scipy.ndimage.correlate(im, kernel_v, mode='constant') # blur from vertical direction
+    bh_im = scipy.ndimage.correlate(im, kernel_h, mode='constant') # blur from horizontal direction
+    
+    # compute variation
+    Dv_im = np.absolute(im[:, 0:v-1] - im[:, 1:v])  # variation from vertical direction
+    Dh_im = np.absolute(im[0:h-1, :] - im[1:h, :])  # variation from orizontal direction
+    #
+    D_bv_im = np.absolute(bv_im[:, 0:v-1] - bv_im[:, 1:v])  # variation from vertical direction
+    D_bh_im = np.absolute(bh_im[0:h-1,:] - bh_im[1:h, :])  # variation from orizontal direction
+    # 
+    D_v = Dv_im - D_bv_im
+    D_w = Dh_im - D_bh_im
+    V_Ver = np.absolute( D_v * (D_v > 0))  # choose maximum values between 0 and image values
+    V_Hor = np.absolute(D_w * (D_w > 0))
+    
+    s_Fer  = np.sum(np.sum(Dv_im[1:h-1, 1:v-1]))
+    s_Fhor = np.sum(np.sum(Dh_im[1:h-1, 1:v-1]))
+    
+    s_Ver  = np.sum(np.sum(V_Ver[1:h-1, 1:v-1]))
+    s_Vhor = np.sum(np.sum(V_Hor[1:h-1, 1:v-1]))
+    
+    b_Fver = (s_Fer  - s_Ver)/s_Fer
+    b_Fhor = (s_Fhor - s_Vhor)/s_Fhor
+    
+    BlurIdx = np.maximum.reduce([b_Fver,b_Fhor])
+    
+    return BlurIdx
+
+fileName = '2c6a41ad-b9dd-46fd-934b-fd8a57eebd0d_raw'
+LOG_FILENAME = "LogFile_" + fileName + ".log"
+logging.basicConfig(filename=LOG_FILENAME, level=logging.INFO)
+logging.info('This module will process a Blur Quality Metric (BQM) and estimate the imgae quality in term of blurriness')
+logging.info('Start to load data named:  %s', fileName)
+
+try:
+    img = envi.open(fileName +'.hdr', fileName)
+    logging.info('Load data successfully ...')
+except IOError:
+    logging.error('No such file named %s', fileName)
+
+# read rfl_img
+im = img.load()
+row, col, bands = np.shape(im)
+# compute quality
+BQM = np.zeros([1,bands])
+for d in xrange(bands):
+    # print "Processing band %d\n" %d
+    logging.info('Checking band %d', d)
+    temp = im[:,:,d]
+    BQM[0,d] = BlurMetric(temp)
+
+BQM_min  = np.min(BQM)
+BQM_max  = np.max(BQM)
+BQM_mean = np.mean(BQM)
+BQM_round = np.round(BQM,3)
+# save BQM in the JSON File
+if BQM_max>0.5:
+    append_dict = {                   
+      'Blur Quality Metric (BQM)': {
+      'BQM score in all spectra': str(BQM_round),
+      'Minimum BQM':  round(BQM_min,3),
+      'Maximum BQM':  round(BQM_max,3),
+      'Mean BQM':     round(BQM_mean,3),
+      'Warning':     'BQM is above the threshold (0.5). It is recommended to manually check the image quality'
+                                   }
+                  } 
+else:
+    append_dict = {                  
+      'Blur Quality Metric (BQM)': {
+      'BQM score in all spectra': str(BQM_round),
+      'Minimum BQM':  round(BQM_min,3),
+      'Maximum BQM':  round(BQM_max,3),
+      'Mean BQM':     round(BQM_mean,3),
+                                   }
+                  }        
+      
+JASON_FILENAME = fileName[:-4] + "_metadata.json"
+with open(JASON_FILENAME) as f:
+    data = json.load(f)
+data.update(append_dict)
+with open(JASON_FILENAME, 'w') as f:
+    entry = {}
+    json.dump(data, f, indent=4) 
+
+logging.info('Quality check is completed and the corresponding results have been saved in the JSON file')
+logging.shutdown()
