@@ -1,14 +1,9 @@
 # Dockerfile for the TerraRef hyperspectral image conversion extractor
-# August 17, 2016
 FROM terraref/terrautils:1.2
 MAINTAINER Max Burnette <mburnet2@illinois.edu>
 
 # Install any programs needed
-# TODO: Can we remove this user ID and mount files as Max?
-RUN useradd -u 49044 extractor \
-    && mkdir -p /home/extractor/sites/ua-mac/raw_data \
-    && mkdir -p /home/extractor/sites/ua-mac/Level_1/hyperspectral \
-    && chown -R extractor /home/extractor
+RUN useradd -u 49044 extractor
 
 # install common libraries and python modules
 RUN apt-get update && apt-get upgrade -y -q && \
