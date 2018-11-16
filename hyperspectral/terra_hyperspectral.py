@@ -38,8 +38,6 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		#if not is_latest_file(resource):
 		#	return CheckMessage.ignore
 
-		logging.getLogger(__name__).info(resource)
-
 		# Adjust sensor path based on VNIR vs SWIR
 		if resource['dataset_info']['name'].find("SWIR") > -1:
 			sensor_fullname = 'swir_netcdf'
@@ -52,13 +50,13 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 			outFilePath = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname)
 
 			if os.path.exists(outFilePath) and not self.overwrite:
-				logging.getLogger(__name__).info('skipping dataset %s, output file already exists' % resource['id'])
+				self.log_skip(resource, 'output file already exists')
 				return CheckMessage.ignore
 			else:
 				# Check if we have necessary metadata, either as a .json file or attached to dataset
 				md = download_metadata(connector, host, secret_key, resource['id'], self.extractor_info['name'])
 				if get_extractor_metadata(md, self.extractor_info['name']) and not self.overwrite:
-					logging.getLogger(__name__).info("skipping dataset %s, already processed" % resource['id'])
+					self.log_skip(resource, "already processed")
 					return CheckMessage.ignore
 				else:
 					return CheckMessage.download
@@ -72,11 +70,11 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 					return CheckMessage.ignore
 				"""
 		else:
-			logging.getLogger(__name__).info('skipping dataset %s, not all input files are ready' % resource['id'])
+			self.log_skip(resource, 'not all input files are ready')
 			return CheckMessage.ignore
 
 	def process_message(self, connector, host, secret_key, resource, parameters):
-		self.start_message()
+		self.start_message(resource)
 
 		# Find input files in dataset
 		target_files = {
@@ -118,7 +116,7 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		if metafile == None:
 			if ds_metafile != None:
 				# Found dataset metadata, so check for the .json file alongside other files
-				logging.getLogger(__name__).info("...checking for local metadata file alongside other files")
+				self.log_info(resource, "checking for local metadata file alongside other files")
 				ds_dir = os.path.dirname(target_files['raw']['path'])
 				for ds_f in os.path.listdir(ds_dir):
 					if ds_f.endswith("_metadata.json"):
@@ -157,20 +155,18 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		outFilePath = self.sensors.create_sensor_path(timestamp, sensor=sensor_fullname)
 
 		# Invoke terraref.sh
-		logging.getLogger(__name__).info('invoking hyperspectral_workflow.sh to create: %s' % outFilePath)
-		# TODO: Move this
-		script_path = "/projects/arpae/terraref/shared/extractors/extractors-hyperspectral/hyperspectral/hyperspectral_workflow.sh"
+		self.log_info(resource, 'invoking hyperspectral_workflow.sh to create: %s' % outFilePath)
 		if soil_mask:
-			returncode = subprocess.call(["bash", script_path, "-d", "1", "-h",
+			returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
 										  "-m", soil_mask, "--new_clb_mth",
 										  "-i", target_files['raw']['path'], "-o", outFilePath])
 		else:
-			returncode = subprocess.call(["bash", script_path, "-d", "1", "-h",
+			returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
 										 "--new_clb_mth",
 										 "-i", target_files['raw']['path'], "-o", outFilePath])
 
 		# Verify outfile exists and upload to clowder
-		logging.getLogger(__name__).info('done creating output file (%s)' % (returncode))
+		self.log_info(resource, 'done creating output file (%s)' % (returncode))
 		if returncode != 0:
 			raise ValueError('script encountered an error')
 		if os.path.exists(outFilePath):
@@ -178,15 +174,15 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 				if outFilePath not in resource['local_paths']:
 					target_dsid = build_dataset_hierarchy(host, secret_key, self.clowder_user, self.clowder_pass, self.clowderspace,
 														  self.sensors.get_display_name(sensor=sensor_fullname),
-														  timestamp[:4], timestamp[:7], timestamp[:10],
+														  timestamp[:4], timestamp[5:7], timestamp[8:10],
 														  leaf_ds_name=self.sensors.get_display_name(sensor=sensor_fullname)+' - '+timestamp)
 
-					logging.getLogger(__name__).info('uploading %s' % outFilePath)
+					self.log_info(resource, 'uploading %s' % outFilePath)
 					upload_to_dataset(connector, host, secret_key, target_dsid, outFilePath)
 				self.created += 1
 				self.bytes += os.path.getsize(outFilePath)
 		else:
-			logging.getLogger(__name__).error('no output file was produced')
+			self.log_error(resource, 'no output file was produced')
 
 		# Send indices to betyDB
 		ind_file = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname, opts=['_ind'])
@@ -214,7 +210,7 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		if tempdir:
 			os.rmdir(tempdir)
 
-		self.end_message()
+		self.end_message(resource)
 
 # Find as many expected files as possible and return the set.
 def get_all_files(resource):

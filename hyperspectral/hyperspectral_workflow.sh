@@ -101,7 +101,8 @@ drc_nco="$( cd -P "$( dirname "${nco_exe}" )" && pwd )"
 nco_vrs=$(ncks --version 2>&1 >/dev/null | grep NCO | awk '{print $5}')
 
 # Hard coded  location to the concatenated env-log directories
-drc_envlog='/gpfs/largeblockFS/projects/arpae/terraref/sites/ua-mac/Level_1/envlog_netcdf'
+# drc_envlog='/gpfs/largeblockFS/projects/arpae/terraref/sites/ua-mac/Level_1/envlog_netcdf'
+drc_envlog='/gpfs_scratch/envlog_netcdf'
 
 # When running in a terminal window (not in an non-interactive batch queue)...
 if [ -n "${TERM}" ]; then

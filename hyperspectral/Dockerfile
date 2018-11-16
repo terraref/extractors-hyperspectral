@@ -1,107 +1,56 @@
 # Dockerfile for the TerraRef hyperspectral image conversion extractor
-# August 17, 2016
-FROM terraref/terrautils
-MAINTAINER Yan Y. Liu <yanliu@illinois.edu>
+FROM terraref/terrautils:1.2
+MAINTAINER Max Burnette <mburnet2@illinois.edu>
+
+# Install any programs needed
+RUN useradd -u 49044 extractor
 
 # install common libraries and python modules
-USER root
-RUN apt-get update && \
-    apt-get upgrade -y -q && \
-    apt-get install -y -q build-essential m4 swig antlr libantlr-dev udunits-bin libudunits2-dev \
-                          unzip cmake wget git libjpeg-dev libpng-dev libtiff-dev \
-                          python-dev python-numpy python-virtualenv bison flex && \
-    # set up dirs for user installed software
-    useradd -m -s /bin/bash ubuntu && \
-    mkdir /srv/downloads && \
-    chown -R ubuntu: /srv/downloads && \
-    mkdir /srv/sw && \
-    chown -R ubuntu: /srv/sw
+RUN apt-get update && apt-get upgrade -y -q && \
+    apt-get install -y \
+        build-essential \
+        libhdf5-dev \
+        libnetcdf-dev \
+        libgdal-dev \
+        python-gdal \
+        gdal-bin \
+        libudunits2-dev \
+        proj-bin \
+        # nco \
+    && rm -rf /var/lib/apt/lists/*
 
-USER ubuntu
-# set env vars for common libraries and python paths
-ENV PYTHONPATH="/usr/lib/python2.7/dist-packages:${PYTHONPATH}"
+# install NCO (apt-get version is only 4.6, need 4.7+)
+RUN apt-get install -y \
+        wget \
+        dpkg \
+    && wget https://launchpad.net/ubuntu/+archive/primary/+files/libgslcblas0_2.5+dfsg-5_amd64.deb \
+    && dpkg -i libgslcblas0_2.5+dfsg-5_amd64.deb \
+    && wget https://launchpad.net/ubuntu/+archive/primary/+files/libgsl23_2.5+dfsg-5_amd64.deb \
+    && dpkg -i libgsl23_2.5+dfsg-5_amd64.deb \
+    && wget http://launchpadlibrarian.net/365856922/libc6_2.27-3ubuntu1_amd64.deb \
+    && dpkg -i libc6_2.27-3ubuntu1_amd64.deb \
+    && wget http://launchpadlibrarian.net/365926929/gcc-8-base_8-20180414-1ubuntu2_amd64.deb \
+    && dpkg -i gcc-8-base_8-20180414-1ubuntu2_amd64.deb \
+    && wget http://launchpadlibrarian.net/365927026/libgfortran5_8-20180414-1ubuntu2_amd64.deb \
+    && dpkg -i libgfortran5_8-20180414-1ubuntu2_amd64.deb \
+    && wget https://launchpad.net/ubuntu/+archive/primary/+files/libhdf5-100_1.10.0-patch1+docs-4build2_amd64.deb \
+    && dpkg -i libhdf5-100_1.10.0-patch1+docs-4build2_amd64.deb \
+    && wget https://launchpad.net/ubuntu/+archive/primary/+files/libnetcdf13_4.6.1-3_amd64.deb \
+    && dpkg -i libnetcdf13_4.6.1-3_amd64.deb \
+    && wget https://launchpad.net/ubuntu/+archive/primary/+files/nco_4.7.6-1_amd64.deb \
+    && dpkg -i nco_4.7.6-1_amd64.deb
 
-## install from source 
+COPY *.sh extractor_info.json *.py *.nc *.nco *.sh /home/extractor/
 
-# hdf5
-RUN cd /srv/downloads && \
-    wget -q https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.8/hdf5-1.8.17/src/hdf5-1.8.17.tar.gz && \
-    tar xfz hdf5-1.8.17.tar.gz && \
-    cd hdf5-1.8.17 && \
-    ./configure --prefix=/srv/sw/hdf5-1.8.17 && \
-    make && make install
-ENV PATH="/srv/sw/hdf5-1.8.17/bin:${PATH}" \
-    LD_LIBRARY_PATH="/srv/sw/hdf5-1.8.17/lib:${LD_LIBRARY_PATH}"
+USER extractor
+ENTRYPOINT ["/home/extractor/entrypoint.sh"]
+CMD ["extractor"]
 
-# netcdf4
-RUN cd /srv/downloads && \
-    wget -q ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4.4.1.tar.gz && \
-    tar xfz netcdf-4.4.1.tar.gz && \
-    cd netcdf-4.4.1 && \
-    CFLAGS="-I/srv/sw/hdf5-1.8.17/include " LDFLAGS=" -L/srv/sw/hdf5-1.8.17/lib " LIBS=" -lhdf5 -lhdf5_hl " ./configure --prefix=/srv/sw/netcdf-4.4.1 --enable-netcdf4 && \
-    make && make install
-ENV PATH="/srv/sw/netcdf-4.4.1/bin:${PATH}" \
-    LD_LIBRARY_PATH="/srv/sw/netcdf-4.4.1/lib:${LD_LIBRARY_PATH}"
-
-# geos
-RUN cd /srv/downloads && \
-    wget -q http://download.osgeo.org/geos/geos-3.5.0.tar.bz2 && \
-    tar xfj geos-3.5.0.tar.bz2 && \
-    cd geos-3.5.0 && \
-    ./configure --prefix=/srv/sw/geos --enable-python && \
-    make && make install
-ENV PATH="/srv/sw/geos/bin:${PATH}" \
-    PYTHONPATH="/srv/sw/geos/lib/python2.7/site-packages:${PYTHONPATH}" \
-    LD_LIBRARY_PATH="/srv/sw/geos/lib:${LD_LIBRARY_PATH}"
-
-# proj4
-RUN cd /srv/downloads && \
-    wget -q https://github.com/OSGeo/proj.4/archive/4.9.2.tar.gz -O proj.4-4.9.2.tar.gz && \
-    tar xfz proj.4-4.9.2.tar.gz && \
-    cd proj.4-4.9.2 && \
-    ./configure --prefix=/srv/sw/proj4  && \
-    make && make install
-ENV PATH="/srv/sw/proj4/bin:${PATH}" \
-    LD_LIBRARY_PATH="/srv/sw/proj4/lib:${LD_LIBRARY_PATH}"
-
-# gdal
-RUN cd /srv/downloads && \
-    wget -q http://download.osgeo.org/gdal/2.1.1/gdal-2.1.1.tar.gz && \
-    tar xfz gdal-2.1.1.tar.gz && \
-    cd gdal-2.1.1 && \
-    ./configure --with-libtiff=internal --with-geotiff=internal --with-png=internal --with-jpeg=internal --with-gif=internal --without-curl --with-python --with-hdf5=/srv/sw/hdf5-1.8.17 --with-netcdf=/srv/sw/netcdf-4.4.1 --with-geos=/srv/sw/geos/bin/geos-config --with-threads --prefix=/srv/sw/gdal && \
-    make && make install
-ENV PATH="/srv/sw/gdal/bin:${PATH}" \
-    PYTHONPATH="/srv/sw/gdal/lib/python2.7/site-packages:${PYTHONPATH}" \
-    LD_LIBRARY_PATH="/srv/sw/gdal/lib:${LD_LIBRARY_PATH}"
-
-# nco
-RUN cd /srv/downloads && \
-    wget -q https://github.com/nco/nco/archive/4.6.7.tar.gz -O nco-4.6.7.tar.gz && \
-    tar xfz nco-4.6.7.tar.gz && \
-    cd nco-4.6.7 && \
-    ./configure NETCDF_ROOT=/srv/sw/netcdf-4.4.1 --prefix=/srv/sw/nco-4.6.7 --enable-ncap2 --enable-udunits2 && \
-    make && make install
-ENV PATH="/srv/sw/nco-4.6.7/bin:${PATH}" \
-    LD_LIBRARY_PATH="/srv/sw/nco-4.6.7/lib:${LD_LIBRARY_PATH}"
-
-ENV USERHOME="/home/ubuntu"
-WORKDIR "${USERHOME}"
-
-## install pyclowder 
-# install python modules
-RUN cd ${USERHOME} && \
-    virtualenv pyenv && \
-    . pyenv/bin/activate && \
-    CC=gcc CXX=g++ USE_SETUPCFG=0 HDF5_INCDIR=/srv/sw/hdf5-1.8.17/include HDF5_LIBDIR=/srv/sw/hdf5-1.8.17/lib NETCDF4_INCDIR=/srv/sw/netcdf-4.4.1/include NETCDF4_LIBDIR=/srv/sw/netcdf-4.4.1/lib pip install netCDF4 && \
-    deactivate
-
-## create workspace directories
-ENV INPUTDIR="${USERHOME}/input"
-RUN mkdir -p "${INPUTDIR}" && \
-    mkdir -p "${USERHOME}/logs"
-
-
-COPY *.sh extractor_info.json *.py *.nc *.nco  ./
-ENTRYPOINT ["./entrypoint.sh"]
-CMD ["python", "./terra_hyperspectral.py"]
+# Setup environment variables. These are passed into the container. You can change
+# these to your setup. If RABBITMQ_URI is not set, it will try and use the rabbitmq
+# server that is linked into the container. MAIN_SCRIPT is set to the script to be
+# executed by entrypoint.sh
+ENV RABBITMQ_EXCHANGE="terra" \
+    RABBITMQ_VHOST="%2F" \
+    RABBITMQ_QUEUE="terra.hyperspectral" \
+    MAIN_SCRIPT="terra_hyperspectral.py"
