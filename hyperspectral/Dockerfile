@@ -1,9 +1,11 @@
 # Dockerfile for the TerraRef hyperspectral image conversion extractor
-FROM terraref/terrautils:1.2
+FROM terraref/terrautils:1.4
 MAINTAINER Max Burnette <mburnet2@illinois.edu>
 
 # Install any programs needed
-RUN useradd -u 49044 extractor
+RUN useradd -u 49044 extractor \
+    && mkdir /home/extractor \
+    && chown extractor /home/extractor
 
 # install common libraries and python modules
 RUN apt-get update && apt-get upgrade -y -q && \
@@ -53,4 +55,5 @@ CMD ["extractor"]
 ENV RABBITMQ_EXCHANGE="terra" \
     RABBITMQ_VHOST="%2F" \
     RABBITMQ_QUEUE="terra.hyperspectral" \
-    MAIN_SCRIPT="terra_hyperspectral.py"
+    MAIN_SCRIPT="terra_hyperspectral.py" \
+    CLOWDER_SPACE="5bdc8f174f0cb2fdaaf3148e"

@@ -102,7 +102,7 @@ nco_vrs=$(ncks --version 2>&1 >/dev/null | grep NCO | awk '{print $5}')
 
 # Hard coded  location to the concatenated env-log directories
 # drc_envlog='/gpfs/largeblockFS/projects/arpae/terraref/sites/ua-mac/Level_1/envlog_netcdf'
-drc_envlog='/gpfs_scratch/envlog_netcdf'
+drc_envlog='/home/extractor/sites/ua-mac/Level_1/envlog_netcdf'
 
 # When running in a terminal window (not in an non-interactive batch queue)...
 if [ -n "${TERM}" ]; then
@@ -553,6 +553,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	xdm_nbr=$(grep '^samples' ${hdr_fl} | cut -d ' ' -f 3 | tr -d '\015')
 	ydm_nbr=$(grep '^lines' ${hdr_fl} | cut -d ' ' -f 3 | tr -d '\015')
 	ntl_in=$(grep '^interleave' ${hdr_fl} | cut -d ' ' -f 3 | tr -d '\015')
+
 	typ_in_ENVI=$(grep '^data type' ${hdr_fl} | cut -d ' ' -f 4 | tr -d '\015')
 	xps_tm=$(grep 'current setting exposure' ${mtd_fl} | cut -d ':' -f 2 | tr -d '" ,\015' )
 	sns_nm=$(grep 'sensor product name' ${mtd_fl} | cut -d ':' -f 2 | tr -d '" ,\015' )
