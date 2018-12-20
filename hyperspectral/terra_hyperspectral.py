@@ -126,7 +126,7 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		# Perform actual processing
 		if (not file_exists(out_nc)) or self.overwrite:
 			self.log_info(resource, 'invoking hyperspectral_workflow.sh to create: %s' % out_nc)
-			if soil_mask:
+			if soil_mask and file_exists(soil_mask):
 				# If soil mask exists, we can generate an _ind indices file
 				returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
 										  "-m", soil_mask, "--new_clb_mth", "-i", raw_file, "-o", out_nc])
