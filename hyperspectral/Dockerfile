@@ -1,5 +1,5 @@
 # Dockerfile for the TerraRef hyperspectral image conversion extractor
-FROM terraref/terrautils:1.4
+FROM ubuntu:16.04
 MAINTAINER Max Burnette <mburnet2@illinois.edu>
 
 # Install any programs needed
@@ -7,44 +7,46 @@ RUN useradd -u 49044 extractor \
     && mkdir /home/extractor \
     && chown extractor /home/extractor
 
-# install common libraries and python modules
-RUN apt-get update && apt-get upgrade -y -q && \
-    apt-get install -y \
-        build-essential \
-        libhdf5-dev \
-        libnetcdf-dev \
-        libgdal-dev \
-        python-gdal \
-        gdal-bin \
-        libudunits2-dev \
-        proj-bin \
-        # nco \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get upgrade -y -q \
+    && apt-get install -y  --no-install-recommends \
+        curl \
+        bzip2 \
+        python \
+        python-pip \
+        git \
+        libpng-dev \
+        libfreetype6-dev \
+        python-matplotlib
 
-# install NCO (apt-get version is only 4.6, need 4.7+)
-RUN apt-get install -y \
-        wget \
-        dpkg \
-    && wget https://launchpad.net/ubuntu/+archive/primary/+files/libgslcblas0_2.5+dfsg-5_amd64.deb \
-    && dpkg -i libgslcblas0_2.5+dfsg-5_amd64.deb \
-    && wget https://launchpad.net/ubuntu/+archive/primary/+files/libgsl23_2.5+dfsg-5_amd64.deb \
-    && dpkg -i libgsl23_2.5+dfsg-5_amd64.deb \
-    && wget http://launchpadlibrarian.net/365856922/libc6_2.27-3ubuntu1_amd64.deb \
-    && dpkg -i libc6_2.27-3ubuntu1_amd64.deb \
-    && wget http://launchpadlibrarian.net/365926929/gcc-8-base_8-20180414-1ubuntu2_amd64.deb \
-    && dpkg -i gcc-8-base_8-20180414-1ubuntu2_amd64.deb \
-    && wget http://launchpadlibrarian.net/365927026/libgfortran5_8-20180414-1ubuntu2_amd64.deb \
-    && dpkg -i libgfortran5_8-20180414-1ubuntu2_amd64.deb \
-    && wget https://launchpad.net/ubuntu/+archive/primary/+files/libhdf5-100_1.10.0-patch1+docs-4build2_amd64.deb \
-    && dpkg -i libhdf5-100_1.10.0-patch1+docs-4build2_amd64.deb \
-    && wget https://launchpad.net/ubuntu/+archive/primary/+files/libnetcdf13_4.6.1-3_amd64.deb \
-    && dpkg -i libnetcdf13_4.6.1-3_amd64.deb \
-    && wget https://launchpad.net/ubuntu/+archive/primary/+files/nco_4.7.6-1_amd64.deb \
-    && dpkg -i nco_4.7.6-1_amd64.deb
+RUN pip install --upgrade pip setuptools pika
 
-COPY *.sh extractor_info.json *.py *.nc *.nco *.sh /home/extractor/
+# install conda
+USER extractor
+RUN cd ~ \
+    && curl https://repo.continuum.io/archive/Anaconda2-5.3.1-Linux-x86_64.sh > Anaconda2-5.3.1-Linux-x86_64.sh \
+    && bash Anaconda2-5.3.1-Linux-x86_64.sh -b
+
+#install conda-forge packages
+RUN ~/anaconda2/bin/conda config --add channels conda-forge \
+    && ~/anaconda2/bin/conda install -y \
+         libnetcdf \
+         hdf5 \
+         netcdf4 \
+         nco \
+         "gdal>2.2.4" \
+         libiconv \
+         xerces-c \
+         geos
+
+# install pyclowder and terrautils
+RUN pip install --user -r https://opensource.ncsa.illinois.edu/bitbucket/projects/CATS/repos/pyclowder2/raw/requirements.txt \
+    && pip install --user git+https://opensource.ncsa.illinois.edu/bitbucket/scm/cats/pyclowder2.git \
+    && pip install --user -r https://raw.githubusercontent.com/terraref/terrautils/master/requirements.txt \
+    && pip install --user git+https://github.com/terraref/terrautils.git
 
 USER extractor
+COPY *.sh extractor_info.json *.py *.nc *.nco *.sh /home/extractor/
+
 ENTRYPOINT ["/home/extractor/entrypoint.sh"]
 CMD ["extractor"]
 
@@ -56,4 +58,5 @@ ENV RABBITMQ_EXCHANGE="terra" \
     RABBITMQ_VHOST="%2F" \
     RABBITMQ_QUEUE="terra.hyperspectral" \
     MAIN_SCRIPT="terra_hyperspectral.py" \
-    CLOWDER_SPACE="5bdc8f174f0cb2fdaaf3148e"
+    CLOWDER_SPACE="5bdc8f174f0cb2fdaaf3148e" \
+    PATH="/home/extractor/anaconda2/bin:${PATH}"
