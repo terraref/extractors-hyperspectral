@@ -44,7 +44,7 @@ RUN pip install --user -r https://opensource.ncsa.illinois.edu/bitbucket/project
     && pip install --user -r https://raw.githubusercontent.com/terraref/terrautils/master/requirements.txt \
     && pip install --user git+https://github.com/terraref/terrautils.git
 
-USER extractor
+COPY logging_config.json /var/log/
 COPY *.sh extractor_info.json *.py *.nc *.nco *.sh /home/extractor/
 
 ENTRYPOINT ["/home/extractor/entrypoint.sh"]
