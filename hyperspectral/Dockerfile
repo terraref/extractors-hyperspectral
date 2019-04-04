@@ -16,7 +16,8 @@ RUN apt-get update && apt-get upgrade -y -q \
         git \
         libpng-dev \
         libfreetype6-dev \
-        python-matplotlib
+        python-matplotlib \
+        libudunits2-dev
 
 RUN pip install --upgrade pip setuptools pika
 
@@ -36,7 +37,8 @@ RUN ~/anaconda2/bin/conda config --add channels conda-forge \
          "gdal>2.2.4" \
          libiconv \
          xerces-c \
-         geos
+         geos \
+         udunits2
 
 # install pyclowder and terrautils
 RUN pip install --user -r https://opensource.ncsa.illinois.edu/bitbucket/projects/CATS/repos/pyclowder2/raw/requirements.txt \
@@ -59,4 +61,5 @@ ENV RABBITMQ_EXCHANGE="terra" \
     RABBITMQ_QUEUE="terra.hyperspectral" \
     MAIN_SCRIPT="terra_hyperspectral.py" \
     CLOWDER_SPACE="5bdc8f174f0cb2fdaaf3148e" \
-    PATH="/home/extractor/anaconda2/bin:${PATH}"
+    PATH="/home/extractor/anaconda2/bin:${PATH}" \
+    UDUNITS2_XML_PATH="/usr/share/xml/udunits/udunits2.xml"
