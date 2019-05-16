@@ -62,4 +62,5 @@ ENV RABBITMQ_EXCHANGE="terra" \
     MAIN_SCRIPT="terra_hyperspectral.py" \
     CLOWDER_SPACE="5bdc8f174f0cb2fdaaf3148e" \
     PATH="/home/extractor/anaconda2/bin:${PATH}" \
-    UDUNITS2_XML_PATH="/usr/share/xml/udunits/udunits2.xml"
+    UDUNITS2_XML_PATH="/usr/share/xml/udunits/udunits2.xml" \
+    HDF5_USE_FILE_LOCKING="FALSE"

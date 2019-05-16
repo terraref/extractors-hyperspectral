@@ -129,11 +129,11 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 			if soil_mask and file_exists(soil_mask):
 				# If soil mask exists, we can generate an _ind indices file
 				returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
-										  "-m", soil_mask, "--new_clb_mth", "-i", raw_file, "-o", out_nc])
+										  "-m", soil_mask, "--output_xps_img", "--new_clb_mth", "-i", raw_file, "-o", out_nc])
 			else:
 				# Otherwise we cannot, and need to trigger soilmask extractor and circle back later
 				returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
-										 "--new_clb_mth", "-i", raw_file, "-o", out_nc])
+											  "--output_xps_img", "--new_clb_mth", "-i", raw_file, "-o", out_nc])
 			if returncode != 0:
 				raise ValueError('script encountered an error')
 
