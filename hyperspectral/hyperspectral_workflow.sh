@@ -589,6 +589,17 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	att_in=${fl_in[$fl_idx]/_raw/_raw.nc}
 	hst_att="`date`: ${cmd_ln};Skipped translation step"
     fi # !trn_flg
+
+    # Subset raw NC file bands
+    att_sub=${fl_in[$fl_idx]/_raw/_raw_sub.nc}
+    att_sub="${att_in}.subset.tmp"
+    cmd_subset="ncks -O -d wavelength,0,938 ${att_in} ${att_sub}"
+    eval ${cmd_subset}
+    if [ $? -ne 0 ] || [ ! -f ${att_sub} ]; then
+		printf "${spt_nm}: ERROR Failed to subset raw data bands. Debug this:\n${cmd_subset}\n"
+		exit 1
+	    fi # !err
+    att_in=${att_sub}
     
     # Add workflow-specific metadata
     if [ "${att_flg}" = 'Yes' ]; then
