@@ -557,7 +557,11 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	typ_in_ENVI=$(grep '^data type' ${hdr_fl} | cut -d ' ' -f 4 | tr -d '\015')
 	xps_tm=$(grep 'current setting exposure' ${mtd_fl} | cut -d ':' -f 2 | tr -d '" ,\015' )
 	sns_nm=$(grep 'sensor product name' ${mtd_fl} | cut -d ':' -f 2 | tr -d '" ,\015' )
+
+	# TODO: Use calibration_vnir_ms_939.nc files if the input file only has 939 bands
 	fl_clb="${drc_spt}/calibration_vnir_${xps_tm}ms.nc"
+
+
 	if [ "${sns_nm}" = 'SWIR' ]; then 
 	    flg_swir='Yes' # [flg] SWIR camera
 	elif [ "${sns_nm}" = 'VNIR' ]; then 
@@ -589,17 +593,6 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	att_in=${fl_in[$fl_idx]/_raw/_raw.nc}
 	hst_att="`date`: ${cmd_ln};Skipped translation step"
     fi # !trn_flg
-
-    # Subset raw NC file bands
-    att_sub=${fl_in[$fl_idx]/_raw/_raw_sub.nc}
-    att_sub="${att_in}.subset.tmp"
-    cmd_subset="ncks -O -d wavelength,0,938 ${att_in} ${att_sub}"
-    eval ${cmd_subset}
-    if [ $? -ne 0 ] || [ ! -f ${att_sub} ]; then
-		printf "${spt_nm}: ERROR Failed to subset raw data bands. Debug this:\n${cmd_subset}\n"
-		exit 1
-	    fi # !err
-    att_in=${att_sub}
     
     # Add workflow-specific metadata
     if [ "${att_flg}" = 'Yes' ]; then
@@ -691,7 +684,7 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
             ncks -A  "${drc_spt}/theblob.nc" "${att_out}" 
             [ "$?" -ne 0 ] && echo "$0: problem copying theblob\n" && exit 1               
 
-            
+            # TODO: For new_clb_method, cst_cnv_trg.nc will need to be subset to 939 bands
             if [ "$sun_flg" = "Yes" ]; then
                #  use the pm targets - these are in bright sunlight - target fixed at 48 %
                ncap2  -A -v  -s "*zd=${zn} ;*trg=48; *expr=${xps_tm};" -S  "${drc_spt}/cst_cnv_trg_mk.nco" "${drc_spt}/cst_cnv_trg2_pm.nc" "${att_out}"              
