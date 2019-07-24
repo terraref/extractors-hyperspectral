@@ -149,7 +149,7 @@ class DataContainer(object):
                 if not _IS_DIGIT(subdata): #Case for letter variables
 
                     ##### For date variables #####
-                    if 'date' in subkey and subkey != "date of installation" and subkey != "date of handover":
+                    if 'date' in subkey and subkey != "date of installation" and subkey != "date of handover" and subkey.find("?") == -1:
                         assert subdata != "todo", '"todo" is not a legal value for the keys'
 
                         tempVariable = tempGroup.createVariable(_reformat_string(subkey), 'f8')
