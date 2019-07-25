@@ -584,31 +584,29 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
     # --------------------------------------------------------------------------------------------------------------------------------
 
     if [ "${sns_nm}" = 'VNIR' ]; then
-        # use calibration_vnir_ms_939.nc files if the input file only has 939 bands
-        # use calibration_vnir_ms.nc files if the input file has 955 bands
+        flg_vnir='Yes' # [flg] VNIR camera
+        # use calibration_939 files if the input file only has 939 bands (new camera) otherwise use original
         #NOTE: assumes wvl_nbr is an int, if it's a string it'll need to changed a bit
         if [ ${wvl_nbr} -eq 939 ]; then
-            fl_clb="${drc_spt}/calibration/calibration_vnir_${xps_tm}ms_939.nc"
+            fl_clb="${drc_spt}/calibration_939/calibration_vnir_${xps_tm}ms.nc"
+            fl_cst="${drc_spt}/cst_cnv_trg_mk_939.nco"
         elif [ ${wvl_nbr} -eq 955 ]; then
             fl_clb="${drc_spt}/calibration/calibration_vnir_${xps_tm}ms.nc"
+            fl_cst="${drc_spt}/cst_cnv_trg_mk.nco"
         else
             echo "ERROR: hdr file ${hdr_fl} reports unhandleable wave length number ${wvl_nbr} (not 939 or 955)"
             exit 1
         fi # !wvl_nbr
-    fi
-
-    # Currently SWIR is uncalibrated so if we have SWIR data, new_clb_flg must be No and we can't calculate hyperspec indices
-	if [ "${sns_nm}" = 'SWIR' ]; then 
-	    flg_swir='Yes' # [flg] SWIR camera
+    elif [ "${sns_nm}" = 'SWIR' ]; then
+        # Currently SWIR is uncalibrated so if we have SWIR data, new_clb_flg must be No and we can't calculate hyperspec indices
+        flg_swir='Yes' # [flg] SWIR camera
 	    new_clb_flg='No'
 	    hsi_flg='No'
-	elif [ "${sns_nm}" = 'VNIR' ]; then 
-	    flg_vnir='Yes' # [flg] VNIR camera
-
 	else
 	    echo "ERROR: metadata file ${fl_mtd} reports unknown camera type ${sns_nm} (not SWIR or VNIR)"
 	    exit 1
-	fi # !wvl_nbr
+    fi
+
 	case "${typ_in_ENVI}" in
 	    4 ) typ_in='NC_FLOAT' ; ;;
 	    12 ) typ_in='NC_USHORT' ; ;;
@@ -736,14 +734,13 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
             ncks -A  "${drc_spt}/theblob.nc" "${att_out}" 
             [ "$?" -ne 0 ] && echo "$0: problem copying theblob\n" && exit 1               
 
-            # TODO: For new_clb_method, cst_cnv_trg.nc will need to be subset to 939 bands
             if [ "$sun_flg" = "Yes" ]; then
                #  use the pm targets - these are in bright sunlight - target fixed at 48 %
-               ncap2  -A -v  -s "*zd=${zn} ;*trg=48; *expr=${xps_tm};" -S  "${drc_spt}/cst_cnv_trg_mk.nco" "${drc_spt}/cst_cnv_trg2_pm.nc" "${att_out}"              
+               ncap2  -A -v  -s "*zd=${zn} ;*trg=48; *expr=${xps_tm};" -S  "${fl_cst}" "${drc_spt}/cst_cnv_trg2_pm.nc" "${att_out}"
                [ "$?" -ne 0 ] && echo "$0: problem getting cst_cnv_trg from nc file \n" && exit 1
             else   
                 #  use the am targets - these are in in the shade of the gantry
-               ncap2  -A -v  -s "*zd=${zn} ;*trg=48; *expr=${xps_tm};" -S  "${drc_spt}/cst_cnv_trg_mk.nco" "${drc_spt}/cst_cnv_trg2_am.nc" "${att_out}"              
+               ncap2  -A -v  -s "*zd=${zn} ;*trg=48; *expr=${xps_tm};" -S  "${fl_cst}" "${drc_spt}/cst_cnv_trg2_am.nc" "${att_out}"
                [ "$?" -ne 0 ] && echo "$0: problem getting cst_cnv_trg from nc file \n" && exit 1
             fi 
 
@@ -1126,7 +1123,6 @@ fi # !0
 # --------------------------------------------------------------------------------------------------------------------------------
 # Cleanup
 # --------------------------------------------------------------------------------------------------------------------------------
-
 
 if [ "${cln_flg}" = 'Yes' ]; then
     printf "Cleaning-up intermediate files...\n"

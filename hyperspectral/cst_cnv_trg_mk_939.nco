@@ -1,0 +1,63 @@
+// Linear  interpolation of zenith angle
+// usage ncap2 -v -O -s 'zd=30.0; exp=25; trg=95; -S hyperspectral_zn.nco cst_cnv_trg_zn_exp_trg.nc cst_cnv_trg.nc
+
+// remember min_cords returns -1 if out of bounds
+
+
+  // linear search for nearest grud point
+  //  assume that zenith is NOT sorted
+  // convert from degrees to cos(zn);
+  zd=cos( zd*3.14159265359/180.0);
+
+  *min=999.0;
+  *t_sz=$time2.size;
+  *min_idx=0;
+  for(*idx=0 ; idx<t_sz; idx++) 
+    if( fabs(zenith(idx)-zd) <min)
+    {    
+        min=fabs(zenith(idx)-zd);
+        min_idx=idx;    
+    }
+  
+  zi=min_idx;
+  
+ 
+
+
+  // remeber min_cords returns -1 if out of bounds
+  *trgi=min_coords(target,trg);
+  // out of bounds
+  if( trgi==-1 ) 
+  {
+    // to little
+    if( trg< target(0) ) 
+      trgi=0;   
+    // too much
+   else
+      trgi=$target.size-1;
+
+    print("trgi out of bounds(target) using the value ");
+    print(target(trgi),"%d\n");    
+  }
+
+
+  // assume the following values - 0/25, 1/30, 2/35, 3/45
+  // remeber min_cords returns -1 if out of bounds
+  *expri=min_coords(exposure, expr);  
+  if( expri==-1)
+  {  
+    if(expr< exposure(0))
+       expri=0;
+    else
+      expri=$exposure.size-1;
+
+    print("expri out of bounds(target) using the value ");
+    print(exposure(expri),"%d\n");    
+
+  }
+
+  cst_cnv_trg_nw = cst_cnv_trg_939(zi,expri,trgi,:).float();
+
+
+
+
