@@ -53,6 +53,8 @@ USER extractor
 
 COPY logging_config.json /var/log/
 COPY *.sh extractor_info.json *.py *.nc *.nco *.sh /home/extractor/
+COPY calibration /home/extractor/calibration
+COPY calibration_939 /home/extractor/calibration_939
 
 ENTRYPOINT ["/home/extractor/entrypoint.sh"]
 CMD ["extractor"]
