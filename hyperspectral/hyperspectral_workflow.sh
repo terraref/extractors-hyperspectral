@@ -19,7 +19,11 @@
 # Direct install:
 # scp ~/terraref/extractors-hyperspectral/hyperspectral/hyperspectral_workflow.sh roger-login.ncsa.illinois.edu:terraref/extractors-hyperspectral/hyperspectral/hyperspectral_workflow.sh
 
+
+# --------------------------------------------------------------------------------------------------------------------------------
 # Set script name, directory, PID, run directory
+# --------------------------------------------------------------------------------------------------------------------------------
+
 drc_pwd=${PWD}
 # Set these before 'module' command which can overwrite ${BASH_SOURCE[0]}
 # NB: dash supports $0 syntax, not ${BASH_SOURCE[0]} syntax
@@ -112,7 +116,10 @@ if [ -n "${TERM}" ]; then
     fnt_rvr=`tput smso` # Reverse
 fi # !TERM
 
+# --------------------------------------------------------------------------------------------------------------------------------
 # Defaults for command-line options and some derived variables
+# --------------------------------------------------------------------------------------------------------------------------------
+
 cln_flg='Yes' # [flg] Clean-up (remove) intermediate files before exiting
 dbg_lvl=0 # [nbr] Debugging level
 dfl_lvl='' # [nbr] [enm] Deflate level [0..9]
@@ -224,6 +231,10 @@ fi
 
 eval set -- $OPTS
 
+# --------------------------------------------------------------------------------------------------------------------------------
+# Prepare flags & paths for different outputs
+# --------------------------------------------------------------------------------------------------------------------------------
+
 declare -a files
 while  [ $# -gt 0 ] ; do
     case "$1" in
@@ -257,9 +268,6 @@ while  [ $# -gt 0 ] ; do
         *) files=("${files[@]}" "$1") ; shift ;;
     esac
 done
-
-
-
 
 # Exract Input and output files from var files
 if [ "${#files[@]}" -gt 0  ]; then
@@ -388,6 +396,10 @@ else # !in_fl
     fi # stdin
 fi # !in_fl
 
+# --------------------------------------------------------------------------------------------------------------------------------
+# MPI job handling
+# --------------------------------------------------------------------------------------------------------------------------------
+
 if [ "${mpi_flg}" = 'Yes' ]; then
     if [ -n "${COBALT_NODEFILE}" ]; then 
 	nd_fl="${COBALT_NODEFILE}"
@@ -438,7 +450,10 @@ if [ "${mpi_flg}" = 'Yes' ]; then
     fi # !thr_usr
 fi # !mpi
 
+# --------------------------------------------------------------------------------------------------------------------------------
 # Print initial state
+# --------------------------------------------------------------------------------------------------------------------------------
+
 if [ ${dbg_lvl} -ge 2 ]; then
     printf "dbg: cln_flg  = ${cln_flg}\n"
     printf "dbg: dbg_lvl  = ${dbg_lvl}\n"
@@ -487,7 +502,10 @@ if [ ${dbg_lvl} -ge 1 ]; then
 fi # !dbg
 date_srt=$(date +"%s")
 
+# --------------------------------------------------------------------------------------------------------------------------------
 # Begin loop over input files
+# --------------------------------------------------------------------------------------------------------------------------------
+
 idx_srt=0
 let idx_end=$((job_nbr-1))
 for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
@@ -524,9 +542,9 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
         exit 1
     fi # !fl_sz
 
-    # ------------------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------------------------------------------------------
     # Convert raster to netCDF
-    # ------------------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------------------------------------------------------
 
     # Raw data stored in ENVI hyperspectral image format in file "test_raw" with accompanying header file "test_raw.hdr"
     # Header file documentation:
@@ -561,6 +579,10 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	xps_tm=$(grep 'current setting exposure' ${mtd_fl} | cut -d ':' -f 2 | tr -d '" ,\015' )
 	sns_nm=$(grep 'sensor product name' ${mtd_fl} | cut -d ':' -f 2 | tr -d '" ,\015' )
 
+    # --------------------------------------------------------------------------------------------------------------------------------
+    # Handle different band counts for VNIR old and new camera (and disable flags for SWIR)
+    # --------------------------------------------------------------------------------------------------------------------------------
+
     if [ "${sns_nm}" = 'VNIR' ]; then
         # use calibration_vnir_ms_939.nc files if the input file only has 939 bands
         # use calibration_vnir_ms.nc files if the input file has 955 bands
@@ -592,6 +614,11 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	    12 ) typ_in='NC_USHORT' ; ;;
 	    * ) printf "${spt_nm}: ERROR Unknown typ_in in ${hdr_fl}. Debug grep command.\n" ; exit 1 ; ;; # Other
 	esac # !typ_in_ENVI
+
+	# --------------------------------------------------------------------------------------------------------------------------------
+    # Translate raw data to .nc file
+    # --------------------------------------------------------------------------------------------------------------------------------
+
 	cmd_trn[${fl_idx}]="ncks -O ${nco_opt} --no_tmp_fl --trr_wxy=${wvl_nbr},${xdm_nbr},${ydm_nbr} --trr typ_in=${typ_in} --trr typ_out=${typ_out} --trr ntl_in=${ntl_in} --trr ntl_out=${ntl_out} --trr_in=${trn_in} ${drc_spt}/hyperspectral_dummy.nc ${trn_out}"
 	hst_att="`date`: ${cmd_ln}"
 	att_in="${trn_out}"
@@ -610,8 +637,11 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	att_in=${fl_in[$fl_idx]/_raw/_raw.nc}
 	hst_att="`date`: ${cmd_ln};Skipped translation step"
     fi # !trn_flg
-    
+
+    # --------------------------------------------------------------------------------------------------------------------------------
     # Add workflow-specific metadata
+    # --------------------------------------------------------------------------------------------------------------------------------
+
     if [ "${att_flg}" = 'Yes' ]; then
 	att_out="${att_fl}.fl${idx_prn}.tmp"
 	printf "att(in)  : ${att_in}\n"
@@ -628,8 +658,11 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	    fi # !err
 	fi # !dbg
     fi # !att_flg
-    
-    # Parse metadata from JSON to netCDF (sensor location, instrument configuration)
+
+    # --------------------------------------------------------------------------------------------------------------------------------
+    # Parse metadata from JSON to netCDF (sensor location, instrument configuration) - uses Python script
+    # --------------------------------------------------------------------------------------------------------------------------------
+
     if [ "${jsn_flg}" = 'Yes' ]; then
 	jsn_in="${fl_in[${fl_idx}]}"
 	jsn_out="${jsn_fl}.fl${idx_prn}.tmp"
@@ -657,12 +690,17 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	fi # !dbg
     fi # !jsn_flg
 
+    # --------------------------------------------------------------------------------------------------------------------------------
+    # Calibration prep
+    #   Currently has new and old method, controlled by --new_clb_flg
+    #   SWIR does not have calibration files, but still attempt to append EnvironmentLogger data
+    # --------------------------------------------------------------------------------------------------------------------------------
 
-    # in almost all senario's this MUST be called
     if [ "${flg_vnir}" = 'Yes' ]; then
-                
         if [ "${new_clb_flg}" = 'Yes' ]; then
-                   
+
+            # --------------------------------- VNIR NEW CALIBRATION METHOD ---------------------------------
+
             sun_flg='Yes'
             #grab first zenith angle from jsn merged data from above
             zn=$( ncks -s "%f" -H -d time,0 -v solar_zenith_angle "${jsn_out}" )
@@ -685,14 +723,11 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
             if [ "$?" -ne 0 ]; then 
                printf "${spt_nm}: ERROR Failed to create \"envlog_path_file\"   from \"frametime(0) in \"${jsn_out}\""       
                exit 1
-            fi          
-
+            fi
             if [ ! -e "${envlog_fl}" ]; then 
                printf "${spt_nm}: ERROR Failed to find/read the env-log file at \"${envlog_fl}\""       
                exit 1
-            fi          
-
-
+            fi
             if [ ${dbg_lvl} -gt 2 ]; then 
                	printf "${spt_nm}: Debug new calibration. zn=${zn} exp=${xps_tm} timestamp_for_ncks=${timestamp_for_ncks} envlog_fl=${envlog_fl}\n"
             fi         
@@ -722,6 +757,9 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
             [ "$?" -ne 0 ] && echo "$0: problem reinterpolating down-welling \n" && exit 1  
                           
         else
+
+             # --------------------------------- VNIR OLD CALIBRATION METHOD ---------------------------------
+
             # environment logger downwelling radiance --------
             #grab first zenith angle from jsn merged data from above
             zn=$( ncks -s "%f" -H -d time,0 -v solar_zenith_angle "${jsn_out}" )
@@ -750,8 +788,6 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 
             [ "$?" -ne 0 ] && echo "$0: problem reinterpolating down-welling \n" && exit 1
 
-            # ------------------
-
             # 20161114: adds exposure-appropriate calibration data to VNIR image files
             cmd_int[${fl_idx}]="ncks -A -C -v xps_img_wht,xps_img_drk ${fl_clb} ${att_out}"
             if [ ${dbg_lvl} -ge 1 ]; then
@@ -766,6 +802,9 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
             fi
         fi
     else # flg_swir
+
+        # --------------------------------- SWIR CALIBRATION METHOD ---------------------------------
+
         #grab first zenith angle from jsn merged data from above
         zn=$( ncks -s "%f" -H -d time,0 -v solar_zenith_angle "${jsn_out}" )
         if [ "$?" -ne 0 ]; then
@@ -794,7 +833,10 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
         [ "$?" -ne 0 ] && echo "$0: problem reinterpolating down-welling \n" && exit 1
    fi # !flg_vnir
 
-    # First Merge add only coordinate vars
+    # --------------------------------------------------------------------------------------------------------------------------------
+    # First Merge add only coordinate vars (mrg)
+    # --------------------------------------------------------------------------------------------------------------------------------
+
     if [ "${mrg_flg}" = 'Yes' ]; then
 	mrg_in=${jsn_out}
 	mrg_out=${att_out}
@@ -813,7 +855,10 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	fi # !dbg
     fi # !mrg_flg
 
-    #create intermediate file of vars xps_img, xps_img_wht, xps_img_drk and coords x,y. wavelength
+    # --------------------------------------------------------------------------------------------------------------------------------
+    # create intermediate file of vars xps_img, xps_img_wht, xps_img_drk and coords x,y. wavelength
+    # --------------------------------------------------------------------------------------------------------------------------------
+
     if [ -n "$xps_img_fl" ]; then  
 
        xps_in="${att_out}"
@@ -836,21 +881,21 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
        cmd_xps[${fl_idx}]="cp \"${xps_in}\" \"${xps_out}\""     
 
       if [ ${dbg_lvl} -ge 1 ]; then
-	   echo ${cmd_xps[${fl_idx}]} 
+        echo ${cmd_xps[${fl_idx}]}
+        fi # !dbg
+        if [ ${dbg_lvl} -ne 2 ]; then
+        eval ${cmd_xps[${fl_idx}]}
+        if [ $? -ne 0 ] || [ ! -f ${xps_out} ]; then
+           printf "${spt_nm}: ERROR Failed to copy netcdf file and add coord vars. Debug this:\n${cmd_xps[${fl_idx}]}\n"
+           exit 1
+        fi # !err
        fi # !dbg
-       if [ ${dbg_lvl} -ne 2 ]; then
-	   eval ${cmd_xps[${fl_idx}]}
-	   if [ $? -ne 0 ] || [ ! -f ${xps_out} ]; then
-	       printf "${spt_nm}: ERROR Failed to copy netcdf file and add coord vars. Debug this:\n${cmd_xps[${fl_idx}]}\n"
-	       exit 1
-	   fi # !err
-       fi # !dbg
-
-
     fi
 
-    
+    # --------------------------------------------------------------------------------------------------------------------------------
     # Calibrate
+    # --------------------------------------------------------------------------------------------------------------------------------
+
     if [ "${clb_flg}" = 'Yes' ]; then
 	clb_in=${mrg_out}
 	clb_out="${clb_fl}.fl${idx_prn}.tmp"
@@ -887,19 +932,10 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	    fi # !err
 	fi # !dbg
 
-	# cmd_clb[${fl_idx}]="/bin/mv -f ${clb_in} ${clb_out}"
-	# if [ ${dbg_lvl} -ge 1 ]; then
-	#     echo ${cmd_clb[${fl_idx}]}
-	# fi # !dbg
-	# if [ ${dbg_lvl} -ne 2 ]; then
-	#     eval ${cmd_clb[${fl_idx}]}
-	#     if [ $? -ne 0 ] || [ ! -f ${clb_out} ]; then
-	# 	printf "${spt_nm}: ERROR Failed to move calibrated data. Debug this:\n${cmd_clb[${fl_idx}]}\n"
-	# 	exit 1
-	#     fi # !err
-	# fi # !dbg
+    # --------------------------------------------------------------------------------------------------------------------------------
+    # Calculate hyperspectral indices file (HSI)
+    # --------------------------------------------------------------------------------------------------------------------------------
 
-	# Calculate hyperspectral indices file 
 	if [ "${hsi_flg}" = 'Yes' ]; then
             # check for auto generated include file "hyperspectral_indices_meta.nco" (created from BETYDB )
             hsi_meta="${drc_spt}/hyperspectral_indices_meta.nco"   
@@ -939,13 +975,13 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
                rm "$hsi_out"
                mv "$hsi_tmp" "$hsi_out"   
             fi
-
-
 	fi # !hsi_flg
-        
     fi # !clb_flg
 
+    # --------------------------------------------------------------------------------------------------------------------------------
     # Second  Merge add all the JSON stuff NOT the coordinate vars - they have been added earlier
+    # --------------------------------------------------------------------------------------------------------------------------------
+
     if [ "${mrg_flg}" = 'Yes' ]; then
 	mrg_in=${jsn_out}
 	mrg_out=${clb_out}
@@ -964,9 +1000,10 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	fi # !dbg
     fi # !mrg_flg
 
-
-
+    # --------------------------------------------------------------------------------------------------------------------------------
     # Compress and/or pack final data file
+    # --------------------------------------------------------------------------------------------------------------------------------
+
     if [ "${cmp_flg}" = 'Yes' ]; then
 	cmp_in=${clb_out}
 	cmp_out="${cmp_fl}.fl${idx_prn}.tmp"
@@ -987,7 +1024,10 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
 	rip_in=${clb_out}
     fi # !cmp_flg
 
+    # --------------------------------------------------------------------------------------------------------------------------------
     # Move file to final resting place
+    # --------------------------------------------------------------------------------------------------------------------------------
+
     if [ "${rip_flg}" = 'Yes' ]; then
 	if [ "${cmp_flg}" = 'Yes' ]; then
 	    rip_in=${cmp_out}
@@ -1059,6 +1099,10 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
     
 done # !fl_idx
 
+# --------------------------------------------------------------------------------------------------------------------------------
+# End loop over input files
+# --------------------------------------------------------------------------------------------------------------------------------
+
 # 20160330: Entire block made obsolete by ncks conversion capability
 # Keep in hyperspectral_workflow.sh until wavelength capability re-implemented
 if [ 0 -eq 1 ]; then
@@ -1078,6 +1122,11 @@ if [ 0 -eq 1 ]; then
 	fi # !bch_flg
     fi # !par_typ
 fi # !0
+
+# --------------------------------------------------------------------------------------------------------------------------------
+# Cleanup
+# --------------------------------------------------------------------------------------------------------------------------------
+
 
 if [ "${cln_flg}" = 'Yes' ]; then
     printf "Cleaning-up intermediate files...\n"
