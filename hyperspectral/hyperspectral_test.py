@@ -101,7 +101,7 @@ class HyperspectralWorkflowTest(unittest.TestCase):
         self.assertEqual(len(self.dimensions["y"]), len(self.dimensions["time"]),  msg="The dimension for y should be the same as for time")
 
     def testTheWavelengthDimensionsHaveCorrectValues(self):
-        self.assertIn(len(self.dimensions["wavelength"]), (272, 955), msg="The dimension for wavelength should be either 272 or 955")
+        self.assertIn(len(self.dimensions["wavelength"]), (272, 273, 275, 939, 955), msg="The dimension for wavelength is wrong")
 
     # def testTheGantrySystemFixedMetadataGroupIsCorrectlyNamed(self):
     #     '''
@@ -129,7 +129,7 @@ class HyperspectralWorkflowTest(unittest.TestCase):
         Roughly check if there are enough numbers of wavelengths and compare their values
         '''
         self.wavelengthArray = self.masterNetCDFHandler.variables['wavelength']
-        self.assertIn(len(self.wavelengthArray), (272, 955), msg="The length of the wavelength must be in 272 or 955")
+        self.assertIn(len(self.wavelengthArray), (272, 273, 275, 939, 955), msg="The length of the wavelength is wrong")
     
     def testWavelengthArrayHasCorrectData(self):
         self.wavelengthArray = self.masterNetCDFHandler.variables['wavelength']

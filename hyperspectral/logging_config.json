@@ -1,0 +1,39 @@
+{
+  "version": 1,
+
+  "formatters": {
+    "default": {
+      "format": "%(asctime)-15s %(levelname)-7s : %(name)s - %(message)s"
+    }
+  },
+
+  "handlers": {
+    "console": {
+      "class": "logging.StreamHandler",
+      "formatter": "default",
+      "level": "DEBUG",
+      "stream": "ext://sys.stdout"
+    },
+    "logstash": {
+      "class": "logstash.TCPLogstashHandler",
+      "level": "INFO",
+      "host": "logger.ncsa.illinois.edu",
+      "port": 5000,
+      "message_type": "extractors",
+      "version": 1,
+      "tags": ["TERRA"]
+    }
+  },
+
+  "loggers": {
+    "extractor": {
+      "level": "INFO",
+      "handlers": ["logstash"]
+    }
+  },
+
+  "root": {
+    "level": "DEBUG",
+    "handlers": ["console"]
+  }
+}
