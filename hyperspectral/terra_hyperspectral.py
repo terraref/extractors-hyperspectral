@@ -157,7 +157,7 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 
 			found_in_dest = check_file_in_dataset(connector, host, secret_key, target_dsid, out_nc, remove=self.overwrite)
 			if not found_in_dest or self.overwrite:
-				fileid = upload_to_dataset(connector, host, self.clowder_user, self.clowder_pass, target_dsid, out_nc)
+				fileid = upload_to_dataset(connector, host, secret_key, target_dsid, out_nc)
 				uploaded_file_ids.append(host + ("" if host.endswith("/") else "/") + "files/" + fileid)
 			self.created += 1
 			self.bytes += os.path.getsize(out_nc)
