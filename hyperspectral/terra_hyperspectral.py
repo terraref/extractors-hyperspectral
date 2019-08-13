@@ -112,8 +112,8 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 			# Check for corresponding soil mask to include in workflow.sh if available
 			soil_mask = self.sensors.get_sensor_path(timestamp, sensor='vnir_soil_masks', opts=['soil_mask'])
 		out_nc = self.sensors.create_sensor_path(timestamp, sensor=sensor_fullname)
-		xps_file = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname, opts=['_xps'])
-		ind_file = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname, opts=['_ind'])
+		xps_file = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname, opts=['xps'])
+		ind_file = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname, opts=['ind'])
 		csv_file = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname.replace("_netcdf", "_traits"))
 
 		raw_file, terra_md_full = None, None

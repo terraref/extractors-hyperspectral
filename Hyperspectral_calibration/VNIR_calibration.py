@@ -36,6 +36,7 @@ data_fullpath   = data_folder + '\\' + fileName
 Environmental_Loggar_files = os.listdir(r"I:\terra_ref\Datasets\caibration_data_05_2019\2019-02-28_Environmental_Loggar")
 Environmental_Loggar_dir   = r"I:\terra_ref\Datasets\caibration_data_05_2019\2019-02-28_Environmental_Loggar/"
 save_name                  = 'ref_' + fileName + '.hdr'
+# TODO: should this only be run on new VNIR sensor given these bands?
 num_spectral_bands_VNIR    = 939  # in new VNIR sensor, there are 939 spectral bands
 num_bands_irradiance       = 3648 # in new irradiance sensor, there are 3648 spectral bands
 
