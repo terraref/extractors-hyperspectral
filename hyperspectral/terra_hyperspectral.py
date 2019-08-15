@@ -155,6 +155,10 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 			if returncode != 0:
 				raise ValueError('script encountered an error')
 
+			# Call calibration
+			# if sensor=="vnir" and date < 2018: old_vnir_calibration()
+			# vnir_calibration(out_nc)
+
 			found_in_dest = check_file_in_dataset(connector, host, secret_key, target_dsid, out_nc, remove=self.overwrite)
 			if not found_in_dest or self.overwrite:
 				fileid = upload_to_dataset(connector, host, secret_key, target_dsid, out_nc)
