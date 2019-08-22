@@ -82,19 +82,24 @@ def update_netcdf(inp, rfl_data, subset_range=False):
 
             # Set variables to values
             if name != "rfl_img":
+                print("...%s" % name)
                 dst[name][:] = src[name][:]
             else:
                 if subset_range:
+                    print("...%s (subset)" % name)
                     dst[name][:679,:,:] = rfl_data
                     # 679-955 set to NaN
+                    print("...NaNs")
                     dst[name][679:,:,:] = np.nan
                 else:
-                    dst[name][:,:,:] = rfl_data
+                    print("...%s" % name)
+                    dst[name][:] = rfl_data
 
             # copy variable attributes all at once via dictionary
             dst[name].setncatts(var_dict)
 
         if 'rfl_img' not in src.variables:
+            print("...adding rfl_img")
             dst.createVariable("rfl_img", "f4")
             dst.variables['rfl_img'] = rfl_data
 
@@ -152,7 +157,8 @@ def apply_calibration(raw_filepath):
     print("Loading %s.hdr" % raw_filepath)
     try:
         raw = envi.open(raw_filepath +'.hdr')
-        img_DN  = raw.load()
+        #img_DN  = raw.load()
+        img_DN = raw.open_memmap()
         #head_file = envi.read_envi_header(data_fullpath +'.hdr')
     except IOError:
         print('No such file named %s' % raw_filepath)
@@ -189,8 +195,6 @@ def apply_calibration(raw_filepath):
 
     # load pre-computed the best matched index between image and irradiance sensor spectral bands
     best_matched_index = np.load(best_matched)
-    print("mean_spec %s" % mean_spectrum.shape)
-    print("best_matched_index %s" % best_matched_index.shape)
     test_irridance     =  mean_spectrum[best_matched_index.astype(int).tolist()]
     test_irridance_re  = np.resize(test_irridance, (1, num_spectral_bands))
 
@@ -203,9 +207,13 @@ def apply_calibration(raw_filepath):
     irrad2DN = (g * test_irridance_re) + b
 
     # reflectance computation
-    print("Computing reflectance: %s vs %s" % (img_DN.shape, irrad2DN.shape))
+    print("Computing reflectance")
     rfl_data  = img_DN/irrad2DN
     rfl_data = np.rollaxis(rfl_data, 2, 0)
+
+    # free up memory
+    del img_DN
+    del irrad2DN
 
     # prepare output paths
     print("Generating output")
@@ -228,19 +236,24 @@ def apply_calibration(raw_filepath):
 
 # TODO: This will come from the extractor message
 input_paths = [
-    # swir_old
-    # os.path.join(raw_root, "SWIR/2017-04-16/2017-04-16__11-50-46-707/c6079666-b686-4481-9a4f-0663f5f43a6a_raw"),
-    # swir_new
-    os.path.join(raw_root, "SWIR/2018-09-22/2018-09-22__13-21-35-977/05b7ad1a-a2d7-4dfc-bcec-b1a394ec0892_raw"),
-    os.path.join(raw_root, "SWIR/2018-10-11/2018-10-11__12-11-43-420/dc60c7d5-24bc-432b-a7cb-98ac1da73154_raw"),
-    # vnir_old
-    os.path.join(raw_root, "VNIR/2017-04-15/2017-04-15__11-33-42-265/76efd15f-928a-49f7-a008-4877b8842129_raw"),
-    os.path.join(raw_root, "VNIR/2017-06-18/2017-06-18__14-34-24-390/41a0b327-83ff-4131-b1fd-5ee5254760b6_raw"),
-    # vnir_middle
-    # os.path.join(raw_root, "VNIR/2018-08-18/2018-08-18__11-11-41-890/c5f4d50f-44ad-4e23-9d92-f10e62110ac7_raw"),
-    # os.path.join(raw_root, "VNIR/2018-10-08/2018-10-08__11-41-01-365/5e39a30f-d343-405e-a140-db26dc72eb59_raw"),
-    # vnir_new
-    # os.path.join(raw_root, "VNIR/2019-06-17/2019-06-17__14-03-29-760/d51b6f4c-9246-4da8-9a6c-786bb1dc21bf_raw"),
+# swir_old
+    # NA os.path.join(raw_root, "SWIR/2017-04-16/2017-04-16__11-50-46-707/c6079666-b686-4481-9a4f-0663f5f43a6a_raw"),
+# swir_new
+    # OK os.path.join(raw_root, "SWIR/2018-09-22/2018-09-22__13-21-35-977/05b7ad1a-a2d7-4dfc-bcec-b1a394ec0892_raw"),
+    # OK os.path.join(raw_root, "SWIR/2018-10-11/2018-10-11__12-11-43-420/dc60c7d5-24bc-432b-a7cb-98ac1da73154_raw"),
+# vnir_old
+    # OK os.path.join(raw_root, "VNIR/2017-04-15/2017-04-15__11-33-42-265/76efd15f-928a-49f7-a008-4877b8842129_raw"),
+    # OK os.path.join(raw_root, "VNIR/2017-04-17/2017-04-17__16-39-35-738/a5096c7a-c052-4728-a29b-a5a6119c366c_raw"),
+    # OK os.path.join(raw_root, "VNIR/2017-04-17/2017-07-08__06-30-15-622/5154c9fc-0a51-4a4d-9c79-242539f057ad_raw"),
+    # os.path.join(raw_root, "VNIR/2017-05-13/2017-05-13__12-00-39-756/1bcc7cd0-1205-45a3-b4b3-cbcac6236754_raw"), # Killed
+    # os.path.join(raw_root, "VNIR/2017-06-18/2017-06-18__14-34-24-390/41a0b327-83ff-4131-b1fd-5ee5254760b6_raw"), # Killed
+    # os.path.join(raw_root, "VNIR/2017-07-27/2017-07-27__15-05-11-667/d1643679-bef3-4179-9912-d63bf4cd53c6_raw"),
+    os.path.join(raw_root, "VNIR/2017-08-23/2017-08-23__09-21-43-959/ea0e3408-ed1c-412d-aa68-e75ce2e902b1_raw"),
+# vnir_middle
+    # NA os.path.join(raw_root, "VNIR/2018-08-18/2018-08-18__11-11-41-890/c5f4d50f-44ad-4e23-9d92-f10e62110ac7_raw"),
+    # NA os.path.join(raw_root, "VNIR/2018-10-08/2018-10-08__11-41-01-365/5e39a30f-d343-405e-a140-db26dc72eb59_raw"),
+# vnir_new
+    # GEN os.path.join(raw_root, "VNIR/2019-06-17/2019-06-17__14-03-29-760/d51b6f4c-9246-4da8-9a6c-786bb1dc21bf_raw"),
 
 ]
 
