@@ -755,38 +755,38 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
                           
         else
 
-             # --------------------------------- VNIR OLD CALIBRATION METHOD ---------------------------------
+            # --------------------------------- VNIR OLD CALIBRATION METHOD ---------------------------------
 
             # environment logger downwelling radiance --------
-            #grab first zenith angle from jsn merged data from above
-            zn=$( ncks -s "%f" -H -d time,0 -v solar_zenith_angle "${jsn_out}" )
-            if [ "$?" -ne 0 ]; then
-               printf "${spt_nm}: ERROR Failed to grab first calibration angle. from \"${jsn_out}\""
-               exit 1
-            fi
+            # grab first zenith angle from jsn merged data from above
+            #zn=$( ncks -s "%f" -H -d time,0 -v solar_zenith_angle "${jsn_out}" )
+            #if [ "$?" -ne 0 ]; then
+            #   printf "${spt_nm}: ERROR Failed to grab first calibration angle. from \"${jsn_out}\""
+            #   exit 1
+            #fi
 
             # get timestamp from frametime
-            timestamp_for_ncks=$( ncap2 -v -O -s 'timestamp=strftime(frametime(0),"%Y-%m-%d %H:%M");print(timestamp,"%s");' "$jsn_out" "/tmp/foo_$$.nc")
-            if [ "$?" -ne 0 ]; then
-               printf "${spt_nm}: ERROR Failed to grab first timestamp  from \"frametime(0) in \"${jsn_out}\""
-               exit 1
-            fi
+            #timestamp_for_ncks=$( ncap2 -v -O -s 'timestamp=strftime(frametime(0),"%Y-%m-%d %H:%M");print(timestamp,"%s");' "$jsn_out" "/tmp/foo_$$.nc")
+            #if [ "$?" -ne 0 ]; then
+            #   printf "${spt_nm}: ERROR Failed to grab first timestamp  from \"frametime(0) in \"${jsn_out}\""
+            #   exit 1
+            #fi
 
             # create envlog path & filename -     2017-08-11/envlog_netcdf_L1_ua-mac_2017-08-11.nc
-            envlog_fl=$( ncap2 -v -O -s 'regular_time=strftime(frametime(0),"%Y-%m-%d/envlog_netcdf_L1_ua-mac_%Y-%m-%d.nc");print(regular_time,"%s");' "$jsn_out" "/tmp/foo_$$.nc")
-            envlog_fl="${drc_envlog}/${envlog_fl}"
+            #envlog_fl=$( ncap2 -v -O -s 'regular_time=strftime(frametime(0),"%Y-%m-%d/envlog_netcdf_L1_ua-mac_%Y-%m-%d.nc");print(regular_time,"%s");' "$jsn_out" "/tmp/foo_$$.nc")
+            #envlog_fl="${drc_envlog}/${envlog_fl}"
 
             # copy flx_spc_dwn from environmental logger
-            ncks -A -C -v flx_spc_dwn -d time,"$timestamp_for_ncks" "$envlog_fl" "${att_out}"
-            [ "$?" -ne 0 ] && echo "$0: problem extracting env-log from $envlog_fl \n" && exit 1
+            #ncks -A -C -v flx_spc_dwn -d time,"$timestamp_for_ncks" "$envlog_fl" "${att_out}"
+            #[ "$?" -ne 0 ] && echo "$0: problem extracting env-log from $envlog_fl \n" && exit 1
 
             #reinterpolate down-welling to wavelength
-            ncap2 -A -v -s '*sz=$wavelength.size' -s '*idx=0' -s 'for(idx=0; idx < sz; idx++) flx_dwn_spc_img(idx)=flx_spc_dwn(0, wavelength_wvl_lgr_ind(idx));' -s 'where(flx_dwn_spc_img<=0.0f) flx_dwn_spc_img=1.0e36f' -s 'flx_dwn_spc_img.set_miss(1.0e36f)' "$att_out" "$att_out"
-
-            [ "$?" -ne 0 ] && echo "$0: problem reinterpolating down-welling \n" && exit 1
+            #ncap2 -A -v -s 'flx_dwn_spc_img=array(0,1,$wavelength.size)' -s '*sz=$wavelength.size' -s '*idx=0' -s 'for(idx=0; idx < sz; idx++) flx_dwn_spc_img(idx)=flx_spc_dwn(0, wavelength_wvl_lgr_ind(idx));' -s 'where(flx_dwn_spc_img<=0.0f) flx_dwn_spc_img=1.0e36f' -s 'flx_dwn_spc_img.set_miss(1.0e36f)' "$att_out" "$att_out"
+            #[ "$?" -ne 0 ] && echo "$0: problem reinterpolating down-welling \n" && exit 1
 
             # 20161114: adds exposure-appropriate calibration data to VNIR image files
             cmd_int[${fl_idx}]="ncks -A -C -v xps_img_wht,xps_img_drk ${fl_clb} ${att_out}"
+
             if [ ${dbg_lvl} -ge 1 ]; then
                 echo ${cmd_int[${fl_idx}]}
             fi # !dbg
@@ -801,34 +801,33 @@ for ((fl_idx=0;fl_idx<${fl_nbr};fl_idx++)); do
     else # flg_swir
 
         # --------------------------------- SWIR CALIBRATION METHOD ---------------------------------
-
-        #grab first zenith angle from jsn merged data from above
-        zn=$( ncks -s "%f" -H -d time,0 -v solar_zenith_angle "${jsn_out}" )
-        if [ "$?" -ne 0 ]; then
-           printf "${spt_nm}: ERROR Failed to grab first calibration angle. from \"${jsn_out}\""
-           exit 1
-        fi
+        printf "${spt_nm}: No current calibration step for SWIR"
+        # grab first zenith angle from jsn merged data from above
+        #zn=$( ncks -s "%f" -H -d time,0 -v solar_zenith_angle "${jsn_out}" )
+        #if [ "$?" -ne 0 ]; then
+        #   printf "${spt_nm}: ERROR Failed to grab first calibration angle. from \"${jsn_out}\""
+        #   exit 1
+        #fi
 
         # get timestamp from frametime
-        timestamp_for_ncks=$( ncap2 -v -O -s 'timestamp=strftime(frametime(0),"%Y-%m-%d %H:%M");print(timestamp,"%s");' "$jsn_out" "/tmp/foo_$$.nc")
-        if [ "$?" -ne 0 ]; then
-           printf "${spt_nm}: ERROR Failed to grab first timestamp  from \"frametime(0) in \"${jsn_out}\""
-           exit 1
-        fi
+        #timestamp_for_ncks=$( ncap2 -v -O -s 'timestamp=strftime(frametime(0),"%Y-%m-%d %H:%M");print(timestamp,"%s");' "$jsn_out" "/tmp/foo_$$.nc")
+        #if [ "$?" -ne 0 ]; then
+        #   printf "${spt_nm}: ERROR Failed to grab first timestamp  from \"frametime(0) in \"${jsn_out}\""
+        #   exit 1
+        #fi
 
         # create envlog path & filename -     2017-08-11/envlog_netcdf_L1_ua-mac_2017-08-11.nc
-        envlog_fl=$( ncap2 -v -O -s 'regular_time=strftime(frametime(0),"%Y-%m-%d/envlog_netcdf_L1_ua-mac_%Y-%m-%d.nc");print(regular_time,"%s");' "$jsn_out" "/tmp/foo_$$.nc")
-        envlog_fl="${drc_envlog}/${envlog_fl}"
+        #envlog_fl=$( ncap2 -v -O -s 'regular_time=strftime(frametime(0),"%Y-%m-%d/envlog_netcdf_L1_ua-mac_%Y-%m-%d.nc");print(regular_time,"%s");' "$jsn_out" "/tmp/foo_$$.nc")
+        #envlog_fl="${drc_envlog}/${envlog_fl}"
 
         # copy flx_spc_dwn from environmental logger
-        ncks -A -C -v flx_spc_dwn -d time,"$timestamp_for_ncks" "$envlog_fl" "${att_out}"
-        [ "$?" -ne 0 ] && echo "$0: problem extracting env-log from $envlog_fl \n" && exit 1
+        #ncks -A -C -v flx_spc_dwn -d time,"$timestamp_for_ncks" "$envlog_fl" "${att_out}"
+        #[ "$?" -ne 0 ] && echo "$0: problem extracting env-log from $envlog_fl \n" && exit 1
 
         #reinterpolate down-welling to wavelength
-        ncap2 -A -v -s 'flx_dwn_spc_img=array(0,1,$wavelength.size)' -s '*sz=$wavelength.size' -s '*idx=0' -s 'for(idx=0; idx < sz; idx++) flx_dwn_spc_img(idx)=flx_spc_dwn(0, wavelength_wvl_lgr_ind(idx));' -s 'where(flx_dwn_spc_img<=0.0f) flx_dwn_spc_img=1.0e36f' -s 'flx_dwn_spc_img.set_miss(1.0e36f)' "$att_out" "$att_out"
-
-        [ "$?" -ne 0 ] && echo "$0: problem reinterpolating down-welling \n" && exit 1
-   fi # !flg_vnir
+        #ncap2 -A -v -s 'flx_dwn_spc_img=array(0,1,$wavelength.size)' -s '*sz=$wavelength.size' -s '*idx=0' -s 'for(idx=0; idx < sz; idx++) flx_dwn_spc_img(idx)=flx_spc_dwn(0, wavelength_wvl_lgr_ind(idx));' -s 'where(flx_dwn_spc_img<=0.0f) flx_dwn_spc_img=1.0e36f' -s 'flx_dwn_spc_img.set_miss(1.0e36f)' "$att_out" "$att_out"
+        #[ "$?" -ne 0 ] && echo "$0: problem reinterpolating down-welling \n" && exit 1
+    fi # !flg_vnir
 
     # --------------------------------------------------------------------------------------------------------------------------------
     # First Merge add only coordinate vars (mrg)

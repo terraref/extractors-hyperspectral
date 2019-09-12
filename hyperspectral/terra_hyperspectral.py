@@ -84,6 +84,23 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 	def process_message(self, connector, host, secret_key, resource, parameters):
 		self.start_message(resource)
 
+		# clean tmp directory from any potential failed previous runs
+		flist = os.listdir("/tmp")
+		for f in flist:
+			try:
+				os.remove(os.path.join("/tmp", f))
+			except:
+				pass
+
+		# if file is above configured limit, skip it
+		max_gb = 24 # RAM has 4x requirement, e.g. 24GB requires 96GB RAM
+		for fname in resource['local_paths']:
+			if fname.endswith('raw'): rawfile = fname
+		rawsize = os.stat(rawfile).st_size
+		if rawsize > max_gb * 1000000000:
+			self.log_skip(resource, "filesize %sGB exceeds available RAM" % int(rawsize/1000000000))
+			return False
+
 		timestamp = resource['dataset_info']['name'].split(" - ")[1]
 		if resource['dataset_info']['name'].find("SWIR") > -1:
 			sensor_rawname  = 'SWIR'
@@ -95,7 +112,8 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 			# Check for corresponding soil mask to include in workflow.sh if available
 			soil_mask = self.sensors.get_sensor_path(timestamp, sensor='vnir_soil_masks', opts=['soil_mask'])
 		out_nc = self.sensors.create_sensor_path(timestamp, sensor=sensor_fullname)
-		ind_file = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname, opts=['_ind'])
+		xps_file = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname, opts=['xps'])
+		ind_file = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname, opts=['ind'])
 		csv_file = self.sensors.get_sensor_path(timestamp, sensor=sensor_fullname.replace("_netcdf", "_traits"))
 
 		raw_file, terra_md_full = None, None
@@ -129,17 +147,21 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 			if soil_mask and file_exists(soil_mask):
 				# If soil mask exists, we can generate an _ind indices file
 				returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
-										  "-m", soil_mask, "--output_xps_img", "--new_clb_mth", "-i", raw_file, "-o", out_nc])
+										  "-m", soil_mask, "--output_xps_img", xps_file, "-i", raw_file, "-o", out_nc]) # disable --new_clb_mth
 			else:
 				# Otherwise we cannot, and need to trigger soilmask extractor and circle back later
 				returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
-											  "--output_xps_img", "--new_clb_mth", "-i", raw_file, "-o", out_nc])
+											  "--output_xps_img", xps_file, "-i", raw_file, "-o", out_nc]) # disable --new_clb_mth
 			if returncode != 0:
 				raise ValueError('script encountered an error')
 
+			# Call calibration
+			# if sensor=="vnir" and date < 2018: old_vnir_calibration()
+			# vnir_calibration(out_nc)
+
 			found_in_dest = check_file_in_dataset(connector, host, secret_key, target_dsid, out_nc, remove=self.overwrite)
 			if not found_in_dest or self.overwrite:
-				fileid = upload_to_dataset(connector, host, self.clowder_user, self.clowder_pass, target_dsid, out_nc)
+				fileid = upload_to_dataset(connector, host, secret_key, target_dsid, out_nc)
 				uploaded_file_ids.append(host + ("" if host.endswith("/") else "/") + "files/" + fileid)
 			self.created += 1
 			self.bytes += os.path.getsize(out_nc)

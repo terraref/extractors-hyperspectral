@@ -151,11 +151,13 @@ class DataContainer(object):
                     ##### For date variables #####
                     if 'date' in subkey and subkey != "date of installation" and subkey != "date of handover" and subkey.find("?") == -1:
                         assert subdata != "todo", '"todo" is not a legal value for the keys'
-
-                        tempVariable = tempGroup.createVariable(_reformat_string(subkey), 'f8')
-                        tempVariable[...] = translate_time(subdata)
-                        setattr(tempVariable, "units",     "days since 1970-01-01 00:00:00")
-                        setattr(tempVariable, "calender", "gregorian")
+                        try:
+                            tempVariable = tempGroup.createVariable(_reformat_string(subkey), 'f8')
+                            tempVariable[...] = translate_time(subdata)
+                            setattr(tempVariable, "units",     "days since 1970-01-01 00:00:00")
+                            setattr(tempVariable, "calender", "gregorian")
+                        except:
+                            pass
 
                     setattr(tempGroup, _reformat_string(subkey), subdata)
 
@@ -177,7 +179,7 @@ class DataContainer(object):
         netCDFHandler.createDimension("wavelength", len(wavelength))
 
         # Check if the wavelength is correctly collected
-        assert len(wavelength) in (939, 955, 272, 273), "ERROR: Failed to get wavlength information. Please check if you modified the *.hdr files (length %s)" % len(wavelength)
+        assert len(wavelength) in (939, 955, 272, 273, 275), "ERROR: Failed to get wavlength information. Please check if you modified the *.hdr files (length %s)" % len(wavelength)
 
         camera_opt = 'VNIR' if len(wavelength) in (939, 955) else 'SWIR' # Choose appropriate camera by counting the number of wavelengths.
 
