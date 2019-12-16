@@ -13,6 +13,8 @@ from terrautils.extractors import TerrarefExtractor, is_latest_file, build_datas
 	contains_required_files, file_exists, load_json_file, check_file_in_dataset, build_metadata
 from terrautils.betydb import submit_traits, add_arguments, get_site_boundaries
 
+from calibrate import apply_calibration
+
 # 4.7 GB test...
 # https://terraref.ncsa.illinois.edu/clowder/datasets/5bd21df94f0c5b535a05bded
 # https://terraref.ncsa.illinois.edu/clowder/datasets/58f3be4e4f0c5bee63a521b7
@@ -82,6 +84,40 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 			return CheckMessage.ignore
 
 	def process_message(self, connector, host, secret_key, resource, parameters):
+		self.start_message(resource)
+
+		# clean tmp directory from any potential failed previous runs
+		flist = os.listdir("/tmp")
+		for f in flist:
+			try:
+				os.remove(os.path.join("/tmp", f))
+			except:
+				pass
+
+		# if file is above configured limit, skip it
+		max_gb = 24 # RAM has 4x requirement, e.g. 24GB requires 96GB RAM
+		for fname in resource['local_paths']:
+			if fname.endswith('raw'): rawfile = fname
+		rawsize = os.stat(rawfile).st_size
+		if rawsize > max_gb * 1000000000:
+			self.log_skip(resource, "filesize %sGB exceeds available RAM" % int(rawsize/1000000000))
+			return False
+
+		raw_file = None
+		for fname in resource['local_paths']:
+			if fname.endswith('raw'):
+				raw_file = fname
+		if raw_file is None:
+			raise ValueError("could not locate raw files & metadata in processing")
+
+		# Perform actual processing
+		self.log_info(resource, 'invoking calibration.py on: %s' % raw_file)
+		apply_calibration(raw_file)
+		self.log_info(resource, '...done' % raw_file)
+
+		self.end_message(resource)
+
+	def process_message_old(self, connector, host, secret_key, resource, parameters):
 		self.start_message(resource)
 
 		# clean tmp directory from any potential failed previous runs
