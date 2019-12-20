@@ -311,18 +311,20 @@ for sensor in ["VNIR", "SWIR"]:
                     if f.endswith("_raw"):
                         fpath = os.path.join(ts_dir, f)
                         rawsize = os.stat(fpath).st_size
-                        if rawsize > 24 * 1000000000:
+                        if rawsize > 8 * 1000000000:
                             print("filesize %sGB exceeds available RAM" % int(rawsize/1000000000))
                         else:
-                            print("Generating .nc file")
                             date = fpath.split("/")[-3]
                             timestamp = fpath.split("/")[-2]
 
                             out_path = os.path.dirname(fpath.replace("raw_data", "Level_1").replace("SWIR", "swir_netcdf").replace("VNIR", "vnir_netcdf"))
                             out_file = os.path.join(out_path, "%s_netcdf_L1_ua-mac_%s.nc" % (sensor.lower(), timestamp))
                             xps_file = out_file.replace(".nc", "_xps.nc")
-                            returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
-                                                          "--output_xps_img", xps_file, "-i", fpath, "-o", out_file])
-
-                            print("Calibrating "+f)
-                            apply_calibration(fpath)
+                            calib_file = out_file.replace(".nc", "_newrfl.nc")
+                            if not os.path.isfile(out_file):
+                                print("Generating .nc file")
+                                returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
+                                                              "--output_xps_img", xps_file, "-i", fpath, "-o", out_file])
+                            if not os.path.isfile(calib_file):
+                                print("Calibrating "+f)
+                                apply_calibration(fpath)
