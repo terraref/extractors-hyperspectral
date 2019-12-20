@@ -323,7 +323,7 @@ for sensor in ["VNIR", "SWIR"]:
                             calib_file = out_file.replace(".nc", "_newrfl.nc")
                             if not os.path.isfile(out_file):
                                 print("Generating .nc file")
-                                returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
+                                returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1",
                                                               "--output_xps_img", xps_file, "-i", fpath, "-o", out_file])
                             if not os.path.isdir(os.path.join(raw_root, "EnvironmentLogger", d)):
                                 print("Missing EnvironmentLogger folder for %s - skipping" % d)
