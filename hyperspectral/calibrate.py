@@ -312,7 +312,7 @@ for sensor in ["VNIR", "SWIR"]:
                         fpath = os.path.join(ts_dir, f)
                         rawsize = os.stat(fpath).st_size
                         if rawsize > 8 * 1000000000:
-                            print("filesize %sGB exceeds available RAM" % int(rawsize/1000000000))
+                            print("%s filesize %sGB exceeds available RAM" % (ts, int(rawsize/1000000000)))
                         else:
                             date = fpath.split("/")[-3]
                             timestamp = fpath.split("/")[-2]
@@ -325,6 +325,8 @@ for sensor in ["VNIR", "SWIR"]:
                                 print("Generating .nc file")
                                 returncode = subprocess.call(["bash", "hyperspectral_workflow.sh", "-d", "1", "-h",
                                                               "--output_xps_img", xps_file, "-i", fpath, "-o", out_file])
-                            if not os.path.isfile(calib_file):
+                            if not os.path.isdir(os.path.join(raw_root, "EnvironmentLogger", d)):
+                                print("Missing EnvironmentLogger folder for %s - skipping" % d)
+                            elif not os.path.isfile(calib_file):
                                 print("Calibrating "+f)
                                 apply_calibration(fpath)
