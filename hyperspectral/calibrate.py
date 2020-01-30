@@ -329,4 +329,8 @@ for sensor in ["VNIR", "SWIR"]:
                                 print("Missing EnvironmentLogger folder for %s - skipping" % d)
                             elif not os.path.isfile(calib_file):
                                 print("Calibrating "+f)
-                                apply_calibration(fpath)
+                                try:
+                                    apply_calibration(fpath)
+                                except:
+                                    print("Error calibrating %s" % f)
+                                    continue
