@@ -120,34 +120,35 @@ fi # !TERM
 # Defaults for command-line options and some derived variables
 # --------------------------------------------------------------------------------------------------------------------------------
 
-cln_flg='Yes'                                                                                                                                             # [flg] Clean-up (remove) intermediate files before exiting
-dbg_lvl=0                                                                                                                                                 # [nbr] Debugging level
-dfl_lvl=''                                                                                                                                                # [nbr] [enm] Deflate level [0..9]
-drc_in=''                                                                                                                                                 # [sng] Input file directory
-drc_in_xmp='drc_in'                                                                                                                                       # [sng] Input file directory for examples
-drc_out="${drc_pwd}"                                                                                                                                      # [sng] Output file directory
-drc_out_xmp='drc_out'                                                                                                                                     # [sng] Output file directory for examples
-flg_swir='No'                                                                                                                                             # [flg] SWIR camera
-flg_vnir='No'                                                                                                                                             # [flg] VNIR camera
-gaa_sng="--gaa terraref_script=${spt_nm} --gaa workflow_invocation=\"'${cmd_ln}'\" --gaa terraref_hostname=${HOSTNAME} --gaa terraref_version=${nco_vrs}" # [sng] Global attributes to add
-hdr_pad='10000'                                                                                                                                           # [B] Pad at end of header section
-in_fl=''                                                                                                                                                  # [sng] Input file stub
-in_xmp='test_raw'                                                                                                                                         # [sng] Input file for examples
-fl_nbr=0                                                                                                                                                  # [nbr] Number of files
-job_nbr=6                                                                                                                                                 # [nbr] Job simultaneity for parallelism
-mpi_flg='No'                                                                                                                                              # [sng] Parallelize over nodes
-mtd_mk='Yes'                                                                                                                                              # [sng] Process metadata
-msk_fl=''                                                                                                                                                 # [sng] full canonical file name of soil mask
-nco_opt=''                                                                                                                                                # [sng] NCO defaults (e.g., '-D 1')
-nco_usr=''                                                                                                                                                # [sng] NCO user-configurable options (e.g., '-D 2')
-nd_nbr=1                                                                                                                                                  # [nbr] Number of nodes
-ntl_out='bsq'                                                                                                                                             # [enm] Interleave-type of output
-out_fl=''                                                                                                                                                 # [sng] Output file name
-out_xmp='test.nc4'                                                                                                                                        # [sng] Output file for examples
-par_typ='bck'                                                                                                                                             # [sng] Parallelism type
-typ_out='NC_USHORT'                                                                                                                                       # [enm] netCDF output type
-unq_sfx=".pid${spt_pid}"                                                                                                                                  # [sng] Unique suffix
-xps_img_fl=''                                                                                                                                             # [sng] write Level 0 data intermediate file xps_img, xps_img_wht, xps_img_drk
+cln_flg='Yes'             # [flg] Clean-up (remove) intermediate files before exiting
+dbg_lvl=0                 # [nbr] Debugging level
+dfl_lvl=''                # [nbr] [enm] Deflate level [0..9]
+drc_in=''                 # [sng] Input file directory
+drc_in_xmp='drc_in'       # [sng] Input file directory for examples
+drc_out="${drc_pwd}"      # [sng] Output file directory
+drc_out_xmp='drc_out'     # [sng] Output file directory for examples
+flg_swir='No'             # [flg] SWIR camera
+flg_vnir='No'             # [flg] VNIR camera
+gaa_sng="--gaa terraref_script=${spt_nm} --gaa workflow_invocation=\"'${cmd_ln}'\" --gaa terraref_hostname=${HOSTNAME} --gaa terraref_version=${nco_vrs}"
+                          # [sng] Global attributes to add
+hdr_pad='10000'           # [B] Pad at end of header section
+in_fl=''                  # [sng] Input file stub
+in_xmp='test_raw'         # [sng] Input file for examples
+fl_nbr=0                  # [nbr] Number of files
+job_nbr=6                 # [nbr] Job simultaneity for parallelism
+mpi_flg='No'              # [sng] Parallelize over nodes
+mtd_mk='Yes'              # [sng] Process metadata
+msk_fl=''                 # [sng] full canonical file name of soil mask
+nco_opt=''                # [sng] NCO defaults (e.g., '-D 1')
+nco_usr=''                # [sng] NCO user-configurable options (e.g., '-D 2')
+nd_nbr=1                  # [nbr] Number of nodes
+ntl_out='bsq'             # [enm] Interleave-type of output
+out_fl=''                 # [sng] Output file name
+out_xmp='test.nc4'        # [sng] Output file for examples
+par_typ='bck'             # [sng] Parallelism type
+typ_out='NC_USHORT'       # [enm] netCDF output type
+unq_sfx=".pid${spt_pid}"  # [sng] Unique suffix
+xps_img_fl=''             # [sng] write Level 0 data intermediate file xps_img, xps_img_wht, xps_img_drk
 
 # Set temporary-file directory
 if [ -d '/gpfs_scratch/arpae' ]; then
@@ -170,7 +171,7 @@ att_flg='Yes'       # [sng] Add workflow-specific metadata
 clb_flg='Yes'       # [sng] Calibrate data
 cmp_flg='No'        # [sng] Compress and/or pack data
 hsi_flg='No'        # [sng] Calculate hyperspectral indices from NetCDF file
-hsi_no_pxl_flg='No' #[sng] In the hyperspectral indices file DO NOT output pixel level indices - only averages
+hsi_no_pxl_flg='No' # [sng] In the hyperspectral indices file DO NOT output pixel level indices - only averages
 jsn_flg='Yes'       # [sng] Parse metadata from JSON to netCDF
 mrg_flg='Yes'       # [sng] Merge JSON metadata with image data
 new_clb_flg='No'    # [sng] use new calibration Method
