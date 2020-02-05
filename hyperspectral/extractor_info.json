@@ -1,7 +1,7 @@
 {
   "@context": "http://clowder.ncsa.illinois.edu/contexts/extractors.jsonld",
   "name": "terra.hyperspectral.raw2nc",
-  "version": "2.0",
+  "version": "2.1",
   "description": "Hyperspectral to netCDF",
   "author": "Charlie Zender",
   "contributors": [],
