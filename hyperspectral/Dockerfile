@@ -50,7 +50,7 @@ RUN pip install --user spectral
 
 USER root
 RUN apt-get update && apt-get upgrade -y -q \
-    && apt-get install -y  --no-install-recommends vim
+    && apt-get install -y  --no-install-recommends vim libnetcdf-dev default-jdk
 USER extractor
 
 COPY logging_config.json /var/log/
