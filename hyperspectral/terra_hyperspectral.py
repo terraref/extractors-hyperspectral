@@ -13,7 +13,7 @@ from terrautils.extractors import TerrarefExtractor, is_latest_file, build_datas
 	contains_required_files, file_exists, load_json_file, check_file_in_dataset, build_metadata
 from terrautils.betydb import submit_traits, add_arguments, get_site_boundaries
 
-from calibrate import apply_calibration
+from calibrate import create_empty_netCDF, apply_calibration
 
 # 4.7 GB test...
 # https://terraref.ncsa.illinois.edu/clowder/datasets/5bd21df94f0c5b535a05bded
@@ -94,7 +94,7 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 			except:
 				pass
 
-		# if file is above configured limit, skip it
+		""" if file is above configured limit, skip it
 		max_gb = 24 # RAM has 4x requirement, e.g. 24GB requires 96GB RAM
 		for fname in resource['local_paths']:
 			if fname.endswith('raw'): rawfile = fname
@@ -102,40 +102,7 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		if rawsize > max_gb * 1000000000:
 			self.log_skip(resource, "filesize %sGB exceeds available RAM" % int(rawsize/1000000000))
 			return False
-
-		raw_file = None
-		for fname in resource['local_paths']:
-			if fname.endswith('raw'):
-				raw_file = fname
-		if raw_file is None:
-			raise ValueError("could not locate raw files & metadata in processing")
-
-		# Perform actual processing
-		self.log_info(resource, 'invoking calibration.py on: %s' % raw_file)
-		apply_calibration(raw_file)
-		self.log_info(resource, '...done' % raw_file)
-
-		self.end_message(resource)
-
-	def process_message_old(self, connector, host, secret_key, resource, parameters):
-		self.start_message(resource)
-
-		# clean tmp directory from any potential failed previous runs
-		flist = os.listdir("/tmp")
-		for f in flist:
-			try:
-				os.remove(os.path.join("/tmp", f))
-			except:
-				pass
-
-		# if file is above configured limit, skip it
-		max_gb = 24 # RAM has 4x requirement, e.g. 24GB requires 96GB RAM
-		for fname in resource['local_paths']:
-			if fname.endswith('raw'): rawfile = fname
-		rawsize = os.stat(rawfile).st_size
-		if rawsize > max_gb * 1000000000:
-			self.log_skip(resource, "filesize %sGB exceeds available RAM" % int(rawsize/1000000000))
-			return False
+		"""
 
 		timestamp = resource['dataset_info']['name'].split(" - ")[1]
 		if resource['dataset_info']['name'].find("SWIR") > -1:
@@ -179,6 +146,7 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 
 		# Perform actual processing
 		if (not file_exists(out_nc)) or self.overwrite:
+			"""TODO: OLD AND NOT USED
 			self.log_info(resource, 'invoking hyperspectral_workflow.sh to create: %s' % out_nc)
 			if soil_mask and file_exists(soil_mask):
 				# If soil mask exists, we can generate an _ind indices file
@@ -190,10 +158,13 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 											  "--output_xps_img", xps_file, "-i", raw_file, "-o", out_nc]) # disable --new_clb_mth
 			if returncode != 0:
 				raise ValueError('script encountered an error')
+			"""
 
-			# Call calibration
-			# if sensor=="vnir" and date < 2018: old_vnir_calibration()
-			# vnir_calibration(out_nc)
+			self.log_info(resource, 'invoking python calibration to create: %s' % out_nc)
+			create_empty_netCDF(raw_file, out_nc)
+			self.log_info(resource, 'applying calibration to: %s' % out_nc)
+			apply_calibration(raw_file, out_nc)
+			self.log_info(resource, '...done' % raw_file)
 
 			found_in_dest = check_file_in_dataset(connector, host, secret_key, target_dsid, out_nc, remove=self.overwrite)
 			if not found_in_dest or self.overwrite:
@@ -202,32 +173,36 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 			self.created += 1
 			self.bytes += os.path.getsize(out_nc)
 
-			if not soil_mask:
-				self.log_info(resource, "triggering soil mask extractor on %s" % fileid)
-				submit_extraction(connector, host, secret_key, fileid, "terra.sunshade.soil_removal")
+			# TODO: Still compatible?
+			#if not soil_mask:
+			#	self.log_info(resource, "triggering soil mask extractor on %s" % fileid)
+			#	submit_extraction(connector, host, secret_key, fileid, "terra.sunshade.soil_removal")
 
-		# Send indices to betyDB
-		if file_exists(ind_file):
-			# TODO: Use ncks to trim ind_file to plots before this step
-			plot_no = 'Full Field'
-
-			with Dataset(ind_file, "r") as netCDF_handle:
-				ndvi = netCDF_handle.get_variables_by_attributes(standard_name='normalized_difference_chlorophyll_index_750_705')
-				NDVI705 = ndvi[0].getValue().ravel()[0]
-
-				# TODO: Map the remaining ~50 variables in BETY to create indices file
-				# TODO: In netCDF header,
-
-				csv_header = 'local_datetime,NDVI705,access_level,species,site,' \
-							 'citation_author,citation_year,citation_title,method'
-				csv_vals = '%s,%s,2,Sorghum bicolor,%s,"Butowsky, Henry",2016,' \
-						   'Maricopa Field Station Data and Metadata,Hyperspectral NDVI705 Indices' % (
-								timestamp, NDVI705, plot_no)
-				with open(csv_file, 'w') as c:
-					c.write(csv_header+'\n'+csv_vals)
-
-			# TODO: Send this CSV to betydb & geostreams extractors instead
-			submit_traits(csv_file, bety_key=self.bety_key)
+			# TODO: Sent output to BETYdb
+			"""
+			# Send indices to betyDB
+			if file_exists(ind_file):
+				# TODO: Use ncks to trim ind_file to plots before this step
+				plot_no = 'Full Field'
+	
+				with Dataset(ind_file, "r") as netCDF_handle:
+					ndvi = netCDF_handle.get_variables_by_attributes(standard_name='normalized_difference_chlorophyll_index_750_705')
+					NDVI705 = ndvi[0].getValue().ravel()[0]
+	
+					# TODO: Map the remaining ~50 variables in BETY to create indices file
+					# TODO: In netCDF header,
+	
+					csv_header = 'local_datetime,NDVI705,access_level,species,site,' \
+								 'citation_author,citation_year,citation_title,method'
+					csv_vals = '%s,%s,2,Sorghum bicolor,%s,"Butowsky, Henry",2016,' \
+							   'Maricopa Field Station Data and Metadata,Hyperspectral NDVI705 Indices' % (
+									timestamp, NDVI705, plot_no)
+					with open(csv_file, 'w') as c:
+						c.write(csv_header+'\n'+csv_vals)
+	
+				# TODO: Send this CSV to betydb & geostreams extractors instead
+				submit_traits(csv_file, bety_key=self.bety_key)
+			"""
 
 		self.end_message(resource)
 
