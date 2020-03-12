@@ -239,17 +239,22 @@ def pixel2Geographic(metadata, hdr_path, camera_type):
             y_final_result = np.array([y * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
         else:
             y_final_result = np.array([y * 2 * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
+        # Determine 4 corners of bounding box
+        SE = (x_final_result[0]  * LATITUDE_TO_METER + origin_x, -(y_final_result[0])  * LONGITUDE_TO_METER + origin_y)
+        SW = (x_final_result[0]  * LATITUDE_TO_METER + origin_x, -(y_final_result[-1]) * LONGITUDE_TO_METER + origin_y)
+        NE = (x_final_result[-1] * LATITUDE_TO_METER + origin_x, -(y_final_result[0])  * LONGITUDE_TO_METER + origin_y)
+        NW = (x_final_result[-1] * LATITUDE_TO_METER + origin_x, -(y_final_result[-1]) * LONGITUDE_TO_METER + origin_y)
+
     else:
         if not downsampled:
             y_final_result = np.array([-y * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
         else:
             y_final_result = np.array([-y * 2 * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
-
-    # Determine 4 corners of bounding box
-    SE = (x_final_result[0]  * LATITUDE_TO_METER + origin_x, -(y_final_result[0])  * LONGITUDE_TO_METER + origin_y)
-    SW = (x_final_result[0]  * LATITUDE_TO_METER + origin_x, -(y_final_result[-1]) * LONGITUDE_TO_METER + origin_y)
-    NE = (x_final_result[-1] * LATITUDE_TO_METER + origin_x, -(y_final_result[0])  * LONGITUDE_TO_METER + origin_y)
-    NW = (x_final_result[-1] * LATITUDE_TO_METER + origin_x, -(y_final_result[-1]) * LONGITUDE_TO_METER + origin_y)
+        # Determine 4 corners of bounding box
+        SE = (x_final_result[0]  * LATITUDE_TO_METER + origin_x, -(y_final_result[-1])  * LONGITUDE_TO_METER + origin_y)
+        SW = (x_final_result[0]  * LATITUDE_TO_METER + origin_x, -(y_final_result[0]) * LONGITUDE_TO_METER + origin_y)
+        NE = (x_final_result[-1] * LATITUDE_TO_METER + origin_x, -(y_final_result[-1])  * LONGITUDE_TO_METER + origin_y)
+        NW = (x_final_result[-1] * LATITUDE_TO_METER + origin_x, -(y_final_result[0]) * LONGITUDE_TO_METER + origin_y)
 
     j_bbox = generate_geojson(SE, SW, NE, NW)
 
