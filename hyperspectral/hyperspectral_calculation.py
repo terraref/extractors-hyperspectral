@@ -103,7 +103,7 @@ def generate_geojson(SE, SW, NE, NW):
         ]]
     }
 
-def test_pixel2Geographic(json_path, hdr_path, camera_type):
+def test_pixel2Geographic(json_path, hdr_path, camera_type, out_path=None):
     # operates off raw json md file instead of cleaned metadata in pipeline
     synthetic_metadata = {}
 
@@ -141,7 +141,8 @@ def test_pixel2Geographic(json_path, hdr_path, camera_type):
 
     out = pixel2Geographic(synthetic_metadata, hdr_path, camera_type)
 
-    out_path = "/home/extractor/hs_calib/VNIR/2019-07-25/geojson/%s.geojson" % timestamp
+    if out_path is None:
+        out_path = "/home/extractor/hs_calib/VNIR/2019-07-25/geojson/%s.geojson" % timestamp
     with open(out_path, 'w') as shpfile:
         json.dump(out['bbox_geojson'], shpfile)
 
