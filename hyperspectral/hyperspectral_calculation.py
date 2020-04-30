@@ -9,7 +9,7 @@ from decimal import *
 from terrautils.spatial import scanalyzer_to_latlon
 
 
-LATITUDE_TO_METER = 1 / (30.87 * 3600)
+LATITUDE_TO_METER = 1 / (30.80716 * 3600)
 LONGITUDE_TO_METER  = 1 / (25.906 * 3600) # varies, but has been corrected based on the actual location of the field
 
 
@@ -194,13 +194,6 @@ def pixel2Geographic(metadata, hdr_path, camera_type):
         x_pixel_size = 1.025e-3
     y_pixel_size = 0.98526434004512529576754637665e-3
 
-    if 'scan_speed_m/s' in metadata['gantry_variable_metadata']:
-        scan_speed = metadata['gantry_variable_metadata']['scan_speed_m/s']
-        framepd = metadata['sensor_variable_metadata']['frame_period']
-        downsampled = (scan_speed == 0.04 and framepd > 25)
-    else:
-        downsampled = False
-
     x_camera_pos = float(metadata['sensor_fixed_metadata']["location_in_camera_box_m"]["x"])
     y_camera_pos = float(metadata['sensor_fixed_metadata']["location_in_camera_box_m"]["y"])
     x_gantry_pos = float(metadata['gantry_variable_metadata']["position_m"]["x"])
@@ -217,9 +210,12 @@ def pixel2Geographic(metadata, hdr_path, camera_type):
             y_pixel_num = int(members.split("=")[-1].strip("\n"))
 
     # ----- GET ORIGIN POINT -----
-    REFERENCE_POINT = scanalyzer_to_latlon(0,0) # SE corner of the field latlon coordinates
-    origin_x = REFERENCE_POINT[0]
-    origin_y = REFERENCE_POINT[1]
+    #REFERENCE_POINT = scanalyzer_to_latlon(0,0) # SE corner of the field latlon coordinates
+    #origin_x = REFERENCE_POINT[0]
+    #origin_y = REFERENCE_POINT[1]
+    # hardcoded from the reference point shape file
+    origin_x = 33.074543
+    origin_y = -111.97479
 
     # ----- CALCULATE POSITIONS -----
     x_absolute_pos = x_gantry_pos + x_camera_pos
@@ -236,10 +232,7 @@ def pixel2Geographic(metadata, hdr_path, camera_type):
     x_final_result = np.array(x_final_result)
 
     if scan_dir == "True":
-        if not downsampled:
-            y_final_result = np.array([y * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
-        else:
-            y_final_result = np.array([y * 2 * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
+        y_final_result = np.array([y * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
         # Determine 4 corners of bounding box
         SE = (x_final_result[0]  * LATITUDE_TO_METER + origin_x, -(y_final_result[0])  * LONGITUDE_TO_METER + origin_y)
         SW = (x_final_result[0]  * LATITUDE_TO_METER + origin_x, -(y_final_result[-1]) * LONGITUDE_TO_METER + origin_y)
@@ -247,10 +240,7 @@ def pixel2Geographic(metadata, hdr_path, camera_type):
         NW = (x_final_result[-1] * LATITUDE_TO_METER + origin_x, -(y_final_result[-1]) * LONGITUDE_TO_METER + origin_y)
 
     else:
-        if not downsampled:
-            y_final_result = np.array([-y * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
-        else:
-            y_final_result = np.array([-y * 2 * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
+        y_final_result = np.array([-y * y_pixel_size for y in range(y_pixel_num)]) + y_absolute_pos
         # Determine 4 corners of bounding box
         SE = (x_final_result[0]  * LATITUDE_TO_METER + origin_x, -(y_final_result[-1])  * LONGITUDE_TO_METER + origin_y)
         SW = (x_final_result[0]  * LATITUDE_TO_METER + origin_x, -(y_final_result[0]) * LONGITUDE_TO_METER + origin_y)
