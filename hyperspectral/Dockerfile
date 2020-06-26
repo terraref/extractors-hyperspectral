@@ -11,15 +11,13 @@ RUN apt-get update && apt-get upgrade -y -q \
     && apt-get install -y  --no-install-recommends \
         curl \
         bzip2 \
-        python \
-        python-pip \
+        python3 \
+        python3-pip \
         git \
         libpng-dev \
         libfreetype6-dev \
         python-matplotlib \
         libudunits2-dev
-
-RUN pip install --upgrade pip setuptools pika
 
 # install conda
 USER extractor
@@ -40,17 +38,16 @@ RUN ~/anaconda2/bin/conda config --add channels conda-forge \
          geos \
          udunits2
 
+ENV PATH="/home/extractor/anaconda2/bin:${PATH}"
+
 # install pyclowder and terrautils
 RUN pip install --user -r https://opensource.ncsa.illinois.edu/bitbucket/projects/CATS/repos/pyclowder2/raw/requirements.txt \
     && pip install --user git+https://opensource.ncsa.illinois.edu/bitbucket/scm/cats/pyclowder2.git \
-    && pip install --user -r https://raw.githubusercontent.com/terraref/terrautils/master/requirements.txt \
-    && pip install --user git+https://github.com/terraref/terrautils.git
-
-RUN pip install --user spectral
+    && pip install --user terrautils laspy spectral pika
 
 USER root
 RUN apt-get update && apt-get upgrade -y -q \
-    && apt-get install -y  --no-install-recommends vim
+    && apt-get install -y  --no-install-recommends vim libnetcdf-dev
 USER extractor
 
 COPY logging_config.json /var/log/
@@ -71,6 +68,5 @@ ENV RABBITMQ_EXCHANGE="terra" \
     RABBITMQ_QUEUE="terra.hyperspectral" \
     MAIN_SCRIPT="terra_hyperspectral.py" \
     CLOWDER_SPACE="5bdc8f174f0cb2fdaaf3148e" \
-    PATH="/home/extractor/anaconda2/bin:${PATH}" \
     UDUNITS2_XML_PATH="/usr/share/xml/udunits/udunits2.xml" \
     HDF5_USE_FILE_LOCKING="FALSE"

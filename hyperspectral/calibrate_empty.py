@@ -16,19 +16,20 @@ import numpy as np
 import os
 import spectral.io.envi as envi
 from netCDF4 import Dataset
-from PIL import Image
-from datetime import date, datetime, timedelta
-
-from hyperspectral_calculation import pixel2Geographic, test_pixel2Geographic, solar_zenith_angle
 
 
 raw_root = "/home/extractor/hs_calib"
 calib_root = "/home/extractor"
 
 
-def create_empty_netCDF(raw_file, out_file):
-    if not os.path.isdir(os.path.dirname(out_file)):
-        os.makedirs(os.path.dirname(out_file))
+def create_empty_netCDF(raw_file):
+    out_path = os.path.dirname(raw_file.replace("raw_data", "Level_1").replace("SWIR", "swir_netcdf").replace("VNIR", "vnir_netcdf"))
+    timestamp = raw_file.split("/")[-2]
+    if raw_file.find("VNIR") > -1:
+        camera_type = "vnir"
+    else:
+        camera_type = "swir"
+    out_file = os.path.join(out_path, "%s_netcdf_L1_ua-mac_%s.nc" % (camera_type, timestamp))
 
     empty = Dataset(out_file, "w", format="NETCDF4")
 
@@ -48,128 +49,18 @@ def create_empty_netCDF(raw_file, out_file):
             if hdr_samples is not None and hdr_lines is not None and hdr_bands is not None:
                 break
 
-    # Get number of frames
-    frame_file = raw_file.replace("_raw", "_frameIndex.txt")
-    with open(frame_file, 'r') as frames:
-        num_frames = len(frames.readlines()[1:])
-
     # add dimensions
     empty.createDimension("wavelength", hdr_bands)
-    empty.createDimension("x", hdr_lines)
-    empty.createDimension("y", hdr_samples)
-    empty.createDimension("time", num_frames)
+    empty.createDimension("x", hdr_samples)
+    empty.createDimension("y", hdr_lines)
 
-    # raw reflectance
-    # TODO: Do we need this if it is never populated?
-    v = empty.createVariable("xps_img", "u2", ("wavelength", "x", "y"))
-    v.long_name = "Exposure counts"
-    v.meaning = "Counts on scale from 0 to 2^16-1 = 65535"
-    v.units = "1"
+    # add Variable double temperature(lat,lon)
+    t = empty.createVariable("xps_img", "u2", ("wavelength", "x", "y"))
+    t.long_name = "Exposure counts"
+    t.meaning = "Counts on scale from 0 to 2^16-1 = 65535"
+    t.units = "1"
 
-    # calibrated reflectance
-    v = empty.createVariable("rfl_img", "f8", ("wavelength", "x", "y"))
-    v.long_name = "Reflectance of image"
-    v.standard_name = "surface_albedo"
-    v.units = "1"
-
-    # solar zenith angle
-    v = empty.createVariable("solar_zenith_angle", "f8", ("time"))
-    v.long_name = "Solar Zenith Angle"
-    v.units = "degree"
-    v.notes = "The angle of the sun comparing to the vertical axis of the Cartesian Coordinate"
-    v.acknowledgements = "Algorithm provided by Charles S. Zender, this Python implementation was translated from his original C program"
-
-    # frametime
-    v = empty.createVariable("frametime", "f8", ("time"))
-    v.units = "days since 1970-01-01 00:00:00"
-    v.calendar = "gregorian"
-    v.notes = "date stamp per each scanline"
-
-    # raw location
-    v = empty.createVariable("x", "f8", ("x"))
-    v.units = "meter"
-    v.long_name = "North distance from southeast corner of field"
-    v = empty.createVariable("y", "f8", ("y"))
-    v.units = "meter"
-    v.long_name = "West distance from southeast corner of field"
-    v = empty.createVariable("latitude", "f8", ("x"))
-    v.units = "degree_north"
-    v.long_name = "The precise latitude value for each pixel in the picture"
-    v = empty.createVariable("longitude", "f8", ("y"))
-    v.units = "degree_east"
-    v.long_name = "The precise longitude value for each pixel in the picture"
-
-    # pixel sizes
-    v = empty.createVariable("x_pxl_sz", "f8")
-    v.long_name = "x coordinate length of a single pixel in VNIR images"
-    v.units = "meters"
-    v = empty.createVariable("y_pxl_sz", "f8")
-    v.long_name = "y coordinate length of a single pixel in pictures captured by SWIR and VNIR camera"
-    v.units = "meters"
-
-    # gantry positional variables
-    v = empty.createVariable("x_img_ne", "f8")
-    v.long_name = "Northeast corner of image, north distance to reference point"
-    v.units = "meters"
-    v = empty.createVariable("x_img_nw", "f8")
-    v.long_name = "Northwest corner of image, north distance to reference point"
-    v.units = "meters"
-    v = empty.createVariable("x_img_se", "f8")
-    v.long_name = "Southeast corner of image, north distance to reference point"
-    v.units = "meters"
-    v = empty.createVariable("x_img_sw", "f8")
-    v.long_name = "Southwest corner of image, north distance to reference point"
-    v.units = "meters"
-    v = empty.createVariable("x_reference_point", "f8")
-    v.long_name = "x of the master reference point at southeast corner of field"
-    v.units = "meters"
-    v = empty.createVariable("y_img_ne", "f8")
-    v.long_name = "Northeast corner of image, west distance to reference point"
-    v.units = "meters"
-    v = empty.createVariable("y_img_nw", "f8")
-    v.long_name = "Northwest corner of image, west distance to reference point"
-    v.units = "meters"
-    v = empty.createVariable("y_img_se", "f8")
-    v.long_name = "Southeast corner of image, west distance to reference point"
-    v.units = "meters"
-    v = empty.createVariable("y_img_sw", "f8")
-    v.long_name = "Southwest corner of image, west distance to reference point"
-    v.units = "meters"
-    v = empty.createVariable("y_reference_point", "f8")
-    v.long_name = "y of the master reference point at southeast corner of field"
-    v.units = "meters"
-
-    # lat/lon positional variables
-    v = empty.createVariable("lat_img_ne", "f8")
-    v.long_name = "Latitude of northeast corner of image"
-    v.units = "degrees_north"
-    v = empty.createVariable("lat_img_nw", "f8")
-    v.long_name = "Latitude of northwest corner of image"
-    v.units = "degrees_north"
-    v = empty.createVariable("lat_img_se", "f8")
-    v.long_name = "Latitude of southeast corner of image"
-    v.units = "degrees_north"
-    v = empty.createVariable("lat_img_sw", "f8")
-    v.long_name = "Latitude of southwest corner of image"
-    v.units = "degrees_north"
-    v = empty.createVariable("lat_reference_point", "f8")
-    v.long_name = "Latitude of the master reference point at southeast corner of field"
-    v.units = "degrees_north"
-    v = empty.createVariable("lon_img_ne", "f8")
-    v.long_name = "Longitude of northeast corner of image"
-    v.units = "degrees_east"
-    v = empty.createVariable("lon_img_nw", "f8")
-    v.long_name = "Longitude of northwest corner of image"
-    v.units = "degrees_east"
-    v = empty.createVariable("lon_img_se", "f8")
-    v.long_name = "Longitude of southeast corner of image"
-    v.units = "degrees_east"
-    v = empty.createVariable("lon_img_sw", "f8")
-    v.long_name = "Longitude of southwest corner of image"
-    v.units = "degrees_east"
-    v = empty.createVariable("lon_reference_point", "f8")
-    v.long_name = "Longitude of the master reference point at southeast corner of field"
-    v.units = "degrees_east"
+    empty.createVariable("rfl_img", "f4", ("wavelength", "x", "y"))
 
     # add global attributes
     empty.title = "None given"
@@ -276,61 +167,6 @@ def update_netcdf(inp, rfl_data, camera_type):
             dst.createVariable("rfl_img", "f4")
             dst.variables['rfl_img'] = rfl_data
 
-# calculate frame times and solar zenith angle
-def prepare_header_data(hdr_file, dataset_date):
-    date_tuple = datetime.strptime(dataset_date, "%Y-%m-%d").timetuple()
-    unix_basetime = date(year=1970, month=1, day=1)
-    time_split = date(year=date_tuple.tm_year, month=date_tuple.tm_mon, day=date_tuple.tm_mday) - unix_basetime
-
-    # Extract time of each frame from frameIndex
-    framelist = []
-    frame_file = hdr_file.replace("_raw.hdr", "_frameIndex.txt")
-    with open(frame_file, 'r') as frames:
-        for fl in frames.readlines()[1:]:
-            hour_tuple = datetime.strptime(fl.split()[1], "%H:%M:%S").timetuple()
-            framelist.append((time_split.total_seconds() + hour_tuple.tm_hour*3600.0 + hour_tuple.tm_min*60.0 +
-                              hour_tuple.tm_sec) / (3600.0*24.0))
-
-    sza = [solar_zenith_angle(datetime(year=1970, month=1, day=1) + timedelta(days=ftime)) for ftime in framelist]
-
-    return {
-        'frametime': framelist,
-        'solar_zenith_angle': sza
-    }
-
-# populate empty netCDF headers with metadata & geo information
-def update_netcdf_headers(nc_file, geodata, header_data):
-    with Dataset(nc_file, 'a', mmap=False) as src:
-        src["lat_img_ne"][...] = geodata["bbox_geojson"]["coordinates"][0][0][1]
-        src["lon_img_ne"][...] = geodata["bbox_geojson"]["coordinates"][0][0][0]
-        src["lat_img_nw"][...] = geodata["bbox_geojson"]["coordinates"][0][1][1]
-        src["lon_img_nw"][...] = geodata["bbox_geojson"]["coordinates"][0][1][0]
-        src["lat_img_sw"][...] = geodata["bbox_geojson"]["coordinates"][0][2][1]
-        src["lon_img_sw"][...] = geodata["bbox_geojson"]["coordinates"][0][2][0]
-        src["lat_img_se"][...] = geodata["bbox_geojson"]["coordinates"][0][3][1]
-        src["lon_img_se"][...] = geodata["bbox_geojson"]["coordinates"][0][3][0]
-
-        src["x_img_ne"][...] = geodata["x_coordinates"][-1]
-        src["y_img_ne"][...] = geodata["y_coordinates"][0]
-        src["x_img_nw"][...] = geodata["x_coordinates"][0]
-        src["y_img_nw"][...] = geodata["y_coordinates"][0]
-        src["x_img_sw"][...] = geodata["x_coordinates"][0]
-        src["y_img_sw"][...] = geodata["y_coordinates"][-1]
-        src["x_img_se"][...] = geodata["x_coordinates"][-1]
-        src["y_img_se"][...] = geodata["y_coordinates"][-1]
-
-        src["x_pxl_sz"][...] = geodata["x_pixel_size"]
-        src["y_pxl_sz"][...] = geodata["y_pixel_size"]
-        src["x_reference_point"][...] = geodata["x_reference"]
-        src["y_reference_point"][...] = geodata["y_reference"]
-
-        # TODO: hyperspectral_calculation has x/y swapped for these
-        src["x"][...] = geodata["y_coordinates"]
-        src["y"][...] = geodata["x_coordinates"]
-
-        src["frametime"][...] = header_data['frametime']
-        src["solar_zenith_angle"][...] = header_data['solar_zenith_angle']
-
 # replace rfl_img variable in netcdf with given matrix
 def update_netcdf_band(inp, band, band_data, camera_type):
     if band % 10 == 0:
@@ -343,38 +179,9 @@ def update_netcdf_band(inp, band, band_data, camera_type):
     else:
         inp["rfl_img"][band,:,:] = band_data
 
-# Get the rgb bands from netcdf file and save as jpg image for quick view
-def convert_netcdf_to_jpg(out_file, out_path, camera_type, timestamp):
-    out_rgb = os.path.join(out_path, "%s_netcdf_L1_ua-mac_%s.jpg" % (camera_type.split("_")[0], timestamp)) # define output path and image name
-
-    # extract corresponding rgb bands from different netcdf files (VNIR or SWIR)
-    f = Dataset(out_file)
-    img_arr = np.asarray(f.variables['rfl_img'][:])
-    rgb = np.zeros((img_arr.shape[1],img_arr.shape[2],3),dtype=np.uint8)
-
-    if camera_type.startswith("swir"):
-        r = img_arr[24,:,:]; r *= 255.0/r.max()
-        g = img_arr[51,:,:]; g *= 255.0/g.max()
-        b = img_arr[120,:,:]; b *= 255.0/b.max()
-    else:
-        r = img_arr[376,:,:]; r *= 255.0/r.max()
-        g = img_arr[235,:,:]; g *= 255.0/g.max()
-        b = img_arr[95,:,:]; b *= 255.0/b.max()
-
-    rgb[:,:,0] = r; rgb[:,:,1] = g; rgb[:,:,2] = b
-
-    out_img = Image.fromarray(rgb)
-    out_img.save(out_rgb)
-
-    # free up memory
-    del img_arr; r; g; b; rgb
 
 # apply calibration algorithm to the raw data
-def apply_calibration(raw_filepath, out_file, metadata=None):
-    if not os.path.exists(out_file):
-        print("Error: %s does not exist to calibrate" % out_file)
-        return
-
+def apply_calibration(raw_filepath):
     print("Calibrating %s" % raw_filepath)
 
     # get necessary paths from path to _raw file
@@ -382,7 +189,17 @@ def apply_calibration(raw_filepath, out_file, metadata=None):
     raw_file = os.path.basename(raw_filepath)
     md_file = os.path.join(raw_dir, "%s_metadata.json" % raw_file[:-4])
     date = raw_filepath.split("/")[-3]
-    envlog_dir = os.path.join(raw_root, "EnvironmentLogger/%s" % date)
+    timestamp = raw_filepath.split("/")[-2]
+    envlog_dir   = os.path.join(raw_root, "EnvironmentLogger/%s" % date)
+
+    #     prepare output paths
+    print("Generating output")
+    out_path = os.path.dirname(raw_filepath.replace("raw_data", "Level_1").replace("SWIR", "swir_netcdf").replace("VNIR", "vnir_netcdf"))
+    if not os.path.isdir(out_path):
+        os.makedirs(out_path)
+    if os.path.isfile(out_path):
+        print("Output file already exists: skipping "+out_path)
+        return
 
     # determine type of sensor and age of camera
     if raw_filepath.find("VNIR") > -1:
@@ -415,33 +232,28 @@ def apply_calibration(raw_filepath, out_file, metadata=None):
 
     # load the raw data set
     print("Loading %s.hdr" % raw_filepath)
-    hdr_path = raw_filepath +'.hdr'
     try:
-        raw = envi.open(hdr_path)
+        raw = envi.open(raw_filepath +'.hdr')
+        #        img_DN  = raw.load()
         img_DN = raw.open_memmap()
+        #head_file = envi.read_envi_header(data_fullpath +'.hdr')
     except IOError:
         print('No such file named %s' % raw_filepath)
 
-    if metadata is None:
-        # TEST CODE
-        json_file = raw_filepath.replace("_raw", "_metadata.json")
-        geo = test_pixel2Geographic(json_file, hdr_path, camera_type.split("_")[0].upper())
-    else:
-        geo = pixel2Geographic(metadata, hdr_path, camera_type.split("_")[0].upper())
-
-    print("Updating netCDF headers")
-    header_data = prepare_header_data(hdr_path, date)
-    update_netcdf_headers(out_file, geo, header_data)
-
-    # Since no calibration models are available for swir_old_middle, directly convert the raw data to netcdf
+    # Apply calibration procedure if camera_type == vnir_old, vnir_middle, vnir_new or swir_new. Since no calibration models are available for
+    # swir_old and swir_middle, so directly convert old&middel SWIR raw data to netcdf format
     if camera_type =="swir_old_middle":
+        # Convert the raw swir_old and swir_middle data to netCDF
         img_DN = np.rollaxis(img_DN, 2, 0)
         # Generate output path and call the netCDF conversion function, convert the raw old&middle swir data to netcdf
+        out_path = os.path.dirname(raw_filepath.replace("raw_data", "Level_1").replace("SWIR", "swir_netcdf").replace("VNIR", "vnir_netcdf"))
+        out_file = os.path.join(out_path, "%s_netcdf_L1_ua-mac_%s.nc" % (camera_type.split("_")[0], timestamp))
         update_netcdf(out_file, img_DN, camera_type)
+
         # free up memory
         del img_DN
 
-    else: # apply pre-computed calibration models
+    else: # when camera_type == vnir_old, vnir_middle, vnir_new or swir_new, apply pre-computed calibration models
         # Load the previously created calibration models based on the camera_type
         best_matched = os.path.join(calib_root + "/" + "calibration_new", camera_type, 'best_matched_index.npy')
         bias = os.path.join(calib_root + "/" + "calibration_new", camera_type, 'bias_coeff.npy')
@@ -493,16 +305,30 @@ def apply_calibration(raw_filepath, out_file, metadata=None):
         irrad2DN = (g * test_irridance_re) + b
 
         # reflectance computation
+        out_file = os.path.join(out_path, "%s_netcdf_L1_ua-mac_%s.nc" % (camera_type.split("_")[0], timestamp))
         print("Computing reflectance and updating %s" % out_file)
         with Dataset(out_file, 'a', mmap=False) as src:
-            # TODO: If file size is small enough, don't do this per-band but all at once
             for band_ind in range(img_DN.shape[2]):
                 calibrated_band = img_DN[:,:,band_ind] / irrad2DN[:,band_ind]
+                calibrated_band = np.swapaxes(calibrated_band, 0, 1)
                 update_netcdf_band(src, band_ind, calibrated_band, camera_type)
 
-        # Generate jpg format quick view image of final netcdf file
-        # TODO: Runs out of memory on large files
-        # convert_netcdf_to_jpg(out_file,out_path,camera_type,timestamp)
-
-        del img_DN
         print("All done")
+
+        # save as ENVI file (RGB bands: 392, 252, 127)
+        # VNIR - 376 (R) 235 (G) 95 (B)
+        out_file = os.path.join('ref_%s.hdr' % raw_file)
+        envi.save_image(out_file, Ref, dtype=np.float32, interleave='bil', force = 'True', metadata=head_file)
+
+
+if __name__ == "__main__":
+    # TODO: This will come from the extractor message
+    input_paths = [
+        os.path.join(raw_root, "VNIR/2019-05-23/2019-05-23__13-52-42-629/47265f0b-7a51-43a3-8f7a-bdf11bd6fe38_raw"),
+        #os.path.join(raw_root, "VNIR/2018-08-18/2018-08-18__11-11-41-890/c5f4d50f-44ad-4e23-9d92-f10e62110ac7_raw"),
+    ]
+
+    for p in input_paths:
+        create_empty_netCDF(p)
+        apply_calibration(p)
+
