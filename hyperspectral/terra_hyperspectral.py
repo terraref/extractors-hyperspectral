@@ -148,12 +148,6 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 			"""
 
 			self.log_info(resource, 'invoking python calibration to create: %s' % out_nc)
-			#create_empty_netCDF(raw_file, out_nc)
-			#self.log_info(resource, 'applying calibration to: %s' % out_nc)
-			#apply_calibration(raw_file, out_nc)
-
-			# TODO: THIS IS NEW
-			out_root = os.path.dirname(out_nc)
 			env_root = "/home/extractor/sites/ua-mac/raw_data"
 			process_VNIR(raw_file, 1, "/home/extractor/sites/ua-mac/Level_1_Plots/vnir_netcdf", env_root)
 
