@@ -412,38 +412,6 @@ def process_VNIR(raw_filepath, nc_calib, out_root_dir, raw_env_root):
     crop_positions = {}
     crop_positions, x_map, y_map = find_crop_position(raw_filepath)
 
-
-# ----- Hyperspectral compression parameters -----
-
-    # Lets find a multiplier to get down to about 40 mega-data-points.
-    data_size = img_DN.shape
-    M = np.prod(data_size) / 40000000
-    skipSize = math.ceil(math.sqrt(M))
-    A = np.zeros((img_DN.shape[2], math.ceil(img_DN.shape[1] / skipSize), math.ceil(img_DN.shape[0] / skipSize)))
-
-    for band_ind in range(img_DN.shape[2]):
-        # apply calibration on the reduced size
-        calibrated_band = img_DN[::skipSize, ::skipSize, band_ind] / irrad2DN[:, band_ind]
-        # reorient the data correctly based on the scan direction
-        A[band_ind, :, :] = rotate_band(calibrated_band, scan_dir)
-
-    At = np.transpose(A, [2, 1, 0])
-    nC = A.shape[0]
-    x = A.shape[1]
-    y = A.shape[2]
-    B = np.reshape(At, (x * y, nC), order="F")
-
-    # the val returned here different than Matlab V is already transposed and S is a row vector
-    U, Sigma, Vt = randomized_svd(np.asmatrix(B), n_components=15, n_iter=5, random_state=None)
-    # S needs a bit of work for multiplication... the result is an array
-    S = np.diag(Sigma)
-    reconstructedB = U @ S @ Vt  # equivalent to np.dot(np.dot(U,np.diag(S[::-1])),Vt)
-    reconstructionError = B - reconstructedB
-    maxError = reconstructionError.flatten().max()
-    MSE = np.square(reconstructionError).mean(axis=None)
-    VinvS = np.transpose(Vt) @ np.linalg.inv(S)
-
-
 # ----- Hyperspectral PCA at the plot level -----
 
     for (plot_row, plot_col), (row_range, col_range) in crop_positions.items():
@@ -451,6 +419,36 @@ def process_VNIR(raw_filepath, nc_calib, out_root_dir, raw_env_root):
         # plot_num = cc.fieldPartition_to_plotNum(plot_row, plot_col)
         # plot level the image array initialization
         rgb = np.zeros((img_DN.shape[1], col_range[1] - col_range[0], 3), dtype=np.uint8)
+
+        # ----- Hyperspectral compression parameters -----
+
+        # Lets find a multiplier to get down to about 40 mega-data-points.
+        data_size = (col_range[1] - col_range[0], img_DN.shape[1], img_DN.shape[2])
+        M = np.prod(data_size) / 40000000
+        skipSize = math.ceil(math.sqrt(M))
+        A = np.zeros((data_size[2], math.ceil(data_size[1] / skipSize), math.ceil(data_size[0] / skipSize)))
+
+        for band_ind in range(img_DN.shape[2]):
+            # apply calibration on the reduced size
+            calibrated_band = img_DN[col_range[0]:col_range[1]:skipSize, ::skipSize, band_ind] / irrad2DN[:, band_ind]
+            # reorient the data correctly based on the scan direction
+            A[band_ind, :, :] = rotate_band(calibrated_band, scan_dir)
+
+        At = np.transpose(A, [2, 1, 0])
+        nC = A.shape[0]
+        x = A.shape[1]
+        y = A.shape[2]
+        B = np.reshape(At, (x * y, nC), order="F")
+
+        # the val returned here different than Matlab: V is already transposed and S is a row vector
+        U, Sigma, Vt = randomized_svd(np.asmatrix(B), n_components=15, n_iter=5, random_state=None)
+        # S needs a bit of work for multiplication... the result is an array
+        S = np.diag(Sigma)
+        reconstructedB = U @ S @ Vt  # equivalent to np.dot(np.dot(U,np.diag(S[::-1])),Vt)
+        reconstructionError = B - reconstructedB
+        maxError = reconstructionError.flatten().max()
+        MSE = np.square(reconstructionError).mean(axis=None)
+        VinvS = np.transpose(Vt) @ np.linalg.inv(S)
 
         # prepare output paths
         out_path = os.path.join(out_root_dir, "%s_%s" % (int(plot_row), int(plot_col)))
