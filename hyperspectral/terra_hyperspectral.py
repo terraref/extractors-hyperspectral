@@ -13,11 +13,8 @@ from terrautils.extractors import TerrarefExtractor, is_latest_file, build_datas
 	contains_required_files, file_exists, load_json_file, check_file_in_dataset, build_metadata
 from terrautils.betydb import submit_traits, add_arguments, get_site_boundaries
 
-from calibrate import create_empty_netCDF, apply_calibration
+from hs_crop import process_VNIR
 
-# 4.7 GB test...
-# https://terraref.ncsa.illinois.edu/clowder/datasets/5bd21df94f0c5b535a05bded
-# https://terraref.ncsa.illinois.edu/clowder/datasets/58f3be4e4f0c5bee63a521b7
 
 def add_local_arguments(parser):
 	# add any additional arguments to parser
@@ -94,16 +91,6 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 			except:
 				pass
 
-		""" if file is above configured limit, skip it
-		max_gb = 24 # RAM has 4x requirement, e.g. 24GB requires 96GB RAM
-		for fname in resource['local_paths']:
-			if fname.endswith('raw'): rawfile = fname
-		rawsize = os.stat(rawfile).st_size
-		if rawsize > max_gb * 1000000000:
-			self.log_skip(resource, "filesize %sGB exceeds available RAM" % int(rawsize/1000000000))
-			return False
-		"""
-
 		timestamp = resource['dataset_info']['name'].split(" - ")[1]
 		if resource['dataset_info']['name'].find("SWIR") > -1:
 			sensor_rawname  = 'SWIR'
@@ -161,9 +148,9 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 			"""
 
 			self.log_info(resource, 'invoking python calibration to create: %s' % out_nc)
-			create_empty_netCDF(raw_file, out_nc)
-			self.log_info(resource, 'applying calibration to: %s' % out_nc)
-			apply_calibration(raw_file, out_nc)
+			env_root = "/home/extractor/sites/ua-mac/raw_data"
+			process_VNIR(raw_file, 1, "/home/extractor/sites/ua-mac/Level_1_Plots/vnir_netcdf", env_root)
+
 			self.log_info(resource, '...done' % raw_file)
 
 			found_in_dest = check_file_in_dataset(connector, host, secret_key, target_dsid, out_nc, remove=self.overwrite)
@@ -173,12 +160,12 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 			self.created += 1
 			self.bytes += os.path.getsize(out_nc)
 
-			# TODO: Still compatible?
+			# TODO: Soil mask still compatible in 3.0?
 			#if not soil_mask:
 			#	self.log_info(resource, "triggering soil mask extractor on %s" % fileid)
 			#	submit_extraction(connector, host, secret_key, fileid, "terra.sunshade.soil_removal")
 
-			# TODO: Sent output to BETYdb
+			# TODO: Send 3.0 output to BETYdb - needs more input
 			"""
 			# Send indices to betyDB
 			if file_exists(ind_file):

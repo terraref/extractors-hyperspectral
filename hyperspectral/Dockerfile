@@ -22,7 +22,7 @@ RUN apt-get update && apt-get upgrade -y -q \
 # install conda
 USER extractor
 RUN cd ~ \
-    && curl https://repo.continuum.io/archive/Anaconda2-5.3.1-Linux-x86_64.sh > Anaconda2-5.3.1-Linux-x86_64.sh \
+    && curl https://repo.anaconda.com/archive/Anaconda2-5.3.1-Linux-x86_64.sh > Anaconda2-5.3.1-Linux-x86_64.sh \
     && bash Anaconda2-5.3.1-Linux-x86_64.sh -b
 
 #install conda-forge packages
@@ -40,10 +40,7 @@ RUN ~/anaconda2/bin/conda config --add channels conda-forge \
 
 ENV PATH="/home/extractor/anaconda2/bin:${PATH}"
 
-# install pyclowder and terrautils
-RUN pip install --user -r https://opensource.ncsa.illinois.edu/bitbucket/projects/CATS/repos/pyclowder2/raw/requirements.txt \
-    && pip install --user git+https://opensource.ncsa.illinois.edu/bitbucket/scm/cats/pyclowder2.git \
-    && pip install --user terrautils laspy spectral pika
+RUN pip install --user pyclowder terrautils laspy spectral pika pandas scikit-learn h5py
 
 USER root
 RUN apt-get update && apt-get upgrade -y -q \
@@ -53,8 +50,7 @@ USER extractor
 COPY logging_config.json /var/log/
 COPY *.sh extractor_info.json *.py *.nc *.nco *.sh /home/extractor/
 COPY calibration /home/extractor/calibration
-COPY calibration_939 /home/extractor/calibration_939
-COPY calibration_new /home/extractor/calibration_new
+COPY s9_boundary.csv /home/extractor/s9_boundary.csv
 
 ENTRYPOINT ["/home/extractor/entrypoint.sh"]
 CMD ["extractor"]
