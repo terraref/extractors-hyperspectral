@@ -49,7 +49,7 @@ USER extractor
 
 COPY logging_config.json /var/log/
 COPY *.sh extractor_info.json *.py *.nc *.nco *.sh /home/extractor/
-COPY calibration /home/extractor/calibration
+COPY calibration_new /home/extractor/calibration_new
 COPY s9_boundary.csv /home/extractor/s9_boundary.csv
 
 ENTRYPOINT ["/home/extractor/entrypoint.sh"]
