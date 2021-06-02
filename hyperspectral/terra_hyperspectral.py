@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import os
+import json
+import shutil
 import subprocess
 from netCDF4 import Dataset
 
@@ -194,5 +196,43 @@ class HyperspectralRaw2NetCDF(TerrarefExtractor):
 		self.end_message(resource)
 
 if __name__ == "__main__":
-	extractor = HyperspectralRaw2NetCDF()
-	extractor.start()
+	#extractor = HyperspectralRaw2NetCDF()
+	#extractor.start()
+
+	# TODO: SSL issue running this as extractor - spending too much time debugging for now
+	processed_path = "/home/extractor/sites/ua-mac/Level_1_Plots/vnir_netcdf/processed_history.json"
+	if os.path.isfile(processed_path):
+		print("Loading processed history")
+		with open(processed_path, 'r') as prev:
+			processed_list = json.load(prev)
+	else:
+		processed_list = []
+
+	raw_root = "/home/extractor/sites/ua-mac/raw_data"
+	vnir_dir = os.path.join(raw_root, "VNIR")
+	dates = os.listdir(vnir_dir)
+	for d in dates:
+		if d >= "2019-05-06" and d <= "2019-10-01":
+			date_dir = os.path.join(vnir_dir, d)
+			timestamps = os.listdir(date_dir)
+			for ts in timestamps:
+				if ts.startswith(d):
+					ts_dir = os.path.join(date_dir, ts)
+					files = os.listdir(ts_dir)
+					for f in files:
+						if f.endswith("_raw"):
+							fpath = os.path.join(ts_dir, f)
+							if fpath not in processed_list:
+								dibs_file = os.path.join("/home/extractor/sites/ua-mac/Level_1_Plots/vnir_netcdf", f+"_dibs")
+								if not os.path.isfile(dibs_file):
+									print("Processing %s" % fpath)
+									with open(dibs_file, 'w') as dibs:
+										dibs.write("currently being processed")
+									process_VNIR(fpath, 1, "/home/extractor/sites/ua-mac/Level_1_Plots/vnir_netcdf", raw_root)
+									os.remove(dibs_file)
+									processed_list.append(fpath)
+									shutil.copy(processed_path, processed_path.replace(".json", "_bak.json"))
+									with open(processed_path, 'w') as prev:
+										json.dump(processed_list, prev)
+
+	print("Done processing.")

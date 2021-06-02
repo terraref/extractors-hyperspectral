@@ -52,6 +52,8 @@ COPY *.sh extractor_info.json *.py *.nc *.nco *.sh /home/extractor/
 COPY calibration_new /home/extractor/calibration_new
 COPY s9_boundary.csv /home/extractor/s9_boundary.csv
 
+RUN pip install --user cryptography
+
 ENTRYPOINT ["/home/extractor/entrypoint.sh"]
 CMD ["extractor"]
 

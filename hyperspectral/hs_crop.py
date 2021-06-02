@@ -266,10 +266,13 @@ def find_crop_position(raw_filepath):
     row_plot_num = np.zeros([y_map.size])
     plot_cols_range = []
 
+    print("xy position: %s %s" % (x_map, y_map))
+
     left_most_field_range, _ = cc.fieldPosition_to_fieldPartition(x_map[0], y_map[0])
     right_most_field_range, _ = cc.fieldPosition_to_fieldPartition(x_map[-1], y_map[-1])
 
     if left_most_field_range == right_most_field_range:
+        print("found range in scan: %s" % left_most_field_range)
         plot_ranges = [left_most_field_range]
         plot_ranges_range = [[0, x_map.size - 1]]
     else:
@@ -314,6 +317,8 @@ def process_VNIR(raw_filepath, nc_calib, out_root_dir, raw_env_root):
 
     # ----- Read raw data -----
         # get necessary paths from path to _raw file
+    # TODO: Temp hardcode for S9
+    cc.file_query('/home/extractor/s9_boundary.csv')
 
     raw_dir = os.path.dirname(raw_filepath)
     raw_file = os.path.basename(raw_filepath)
@@ -443,7 +448,6 @@ def process_VNIR(raw_filepath, nc_calib, out_root_dir, raw_env_root):
     MSE = np.square(reconstructionError).mean(axis=None)
     VinvS = np.transpose(Vt) @ np.linalg.inv(S)
 
-
 # ----- Hyperspectral PCA at the plot level -----
 
     for (plot_row, plot_col), (row_range, col_range) in crop_positions.items():
@@ -454,6 +458,7 @@ def process_VNIR(raw_filepath, nc_calib, out_root_dir, raw_env_root):
 
         # prepare output paths
         out_path = os.path.join(out_root_dir, "%s_%s" % (int(plot_row), int(plot_col)))
+        print("Writing to "+out_path)
 
         if not os.path.isdir(out_path):
             os.makedirs(out_path)

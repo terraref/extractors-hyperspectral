@@ -173,8 +173,11 @@ class CoordinateConverter(object):
             betydb.BETYDB_URL = "https://terraref.ncsa.illinois.edu/bety"
         self.plots = get_site_boundaries(str_date, city="Maricopa")
         if len(self.plots) == 0:
+            print("didn't find any plots")
             self.queryStatus = False
             return False
+        else:
+            print("found %s plots" % self.plots)
         plot_season_range_col =  [[int(x) for x in re.findall(r'\d+', x)] for x in list(self.plots.keys())] # find numbers in plot name
         _, max_range, max_col = np.max(plot_season_range_col, axis=0)
         self.max_range = max_range
